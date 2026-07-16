@@ -1,5 +1,7 @@
 #include <iostream>
 #include <cstring>
+#include <vector>
+#include <algorithm>
 #include <map>
 #include "git2.h"
 #include <iomanip>
@@ -92,7 +94,7 @@ int analis(const char *repo_path, time_t since, const char *commit_author, bool 
 
         unsigned int parent_count = git_commit_parentcount(commit);
         git_diff *diff = nullptr;
-        
+
         if (no_merges && parent_count > 1) {
             git_commit_free(commit);
             continue;
@@ -228,6 +230,8 @@ int main(int argc, char *argv[]) {
             }
         }
     }
+
+    std::cout << "Репозиторий: " << repo_path << std::endl;
     
     int error = analis(repo_path, since, author, no_merges);
     if (error != 0) {

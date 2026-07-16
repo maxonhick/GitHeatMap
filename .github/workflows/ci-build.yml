@@ -17,7 +17,7 @@ jobs:
         include:
           - os: windows-latest
             generator: "Visual Studio 17 2022"
-            arch: "x64"
+            arch: "-A x64"
           - os: ubuntu-latest
             generator: "Unix Makefiles"
           - os: macos-latest
@@ -36,16 +36,21 @@ jobs:
         if: runner.os == 'macOS'
         run: brew install libgit2
 
-      - name: Configure CMake
-        uses: threeal/cmake-action@v1.3.0
-        with:
-          source-dir: ${{ github.workspace }}
-          build-dir: ${{ github.workspace }}/build
-          generator: ${{ matrix.generator }}
-          options: CMAKE_CXX_STANDARD=17
+      - name: Install libgit2 (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          git clone https://github.com/Microsoft/vcpkg.git
+          cd vcpkg
+          .\bootstrap-vcpkg.bat
+          .\vcpkg install libgit2:x64-windows
 
-      - name: Build the project
-        run: cmake --build ${{ github.workspace }}/build --config Release
+      - name: Configure CMake
+        run: |
+          cmake -B build -G "${{ matrix.generator }}" ${{ matrix.arch }} -DCMAKE_CXX_STANDARD=17
+        shell: bash
+
+      - name: Build
+        run: cmake --build build --config Release
 
       - name: Upload build artifacts (for debugging)
         uses: actions/upload-artifact@v4
