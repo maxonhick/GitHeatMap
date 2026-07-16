@@ -42,11 +42,7 @@ jobs:
           source-dir: ${{ github.workspace }}
           build-dir: ${{ github.workspace }}/build
           generator: ${{ matrix.generator }}
-          options: |
-            CMAKE_CXX_STANDARD=17
-            # Здесь можно передать любые другие опции
-            # Например, если вы используете vcpkg:
-            # CMAKE_TOOLCHAIN_FILE=${{ env.VCPKG_ROOT }}/scripts/buildsystems/vcpkg.cmake
+          options: CMAKE_CXX_STANDARD=17
 
       - name: Build the project
         run: cmake --build ${{ github.workspace }}/build --config Release

@@ -2,8 +2,8 @@
 
 **Интерактивный анализатор активности Git-репозитория**
 
-[![CI Build](https://github.com/yourusername/git-heatmap/actions/workflows/ci-build.yml/badge.svg)](https://github.com/maxonhick/git-heatmap/actions/workflows/ci-build.yml)
-[![Release](https://github.com/yourusername/git-heatmap/actions/workflows/release.yml/badge.svg)](https://github.com/maxonhick/git-heatmap/actions/workflows/release.yml)
+[![CI Build](https://github.com/maxonhick/GitHeatMap/actions/workflows/ci-build.yml/badge.svg)](https://github.com/maxonhick/GitHeatMap/actions/workflows/ci-build.yml)
+[![Release](https://github.com/maxonhick/GitHeatMap/actions/workflows/release.yml/badge.svg)](https://github.com/maxonhick/GitHeatMap/actions/workflows/release.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ---
