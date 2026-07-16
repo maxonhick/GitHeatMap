@@ -16,7 +16,7 @@ struct FileStat {
 std::string format_time(time_t t) {
     std::tm* tm = std::localtime(&t);
     std::ostringstream oss;
-    oss << std::put_time(tm, "%Y-%m-%d %H:%M:%S");
+    oss << std::put_time(tm, "%Y-%m-%d_%H:%M:%S");
     return oss.str();
 }
 
@@ -36,12 +36,7 @@ int diff_callback(
     return 0;
 }
 
-int main(int argc, char *argv[]) {
-    git_libgit2_init();
-
-    const char *repo_path = ".";
-    if (argc > 1)
-        repo_path = argv[1];
+int analis(const char *repo_path) {
     git_repository *repo = nullptr;
     int error = git_repository_open(&repo, repo_path);
     if (error < 0) {
@@ -56,6 +51,8 @@ int main(int argc, char *argv[]) {
     git_revwalk_sorting(revwalk, GIT_SORT_TIME);
 
     std::map<std::string, FileStat> file_stats;
+
+    std::cout << "Анализ коммитов...\n" << std::endl;
 
     git_oid oid;
     int commit_total_count = 0;
@@ -140,7 +137,7 @@ int main(int argc, char *argv[]) {
         });
     
     std::cout << "=== Топ-10 самых часто изменяемых файлов ===\n";
-    std::cout << std::left << std::setw(8) << "Коммиты"
+    std::cout << std::left << std::setw(9) << "Коммиты"
               << std::setw(60) << "Файл"
               << std::setw(20) << "Последнее изменение"
               << std::endl;
@@ -156,6 +153,68 @@ int main(int argc, char *argv[]) {
     
     git_revwalk_free(revwalk);
     git_repository_free(repo);
+    return 0;
+}
+
+int main(int argc, char *argv[]) {
+    git_libgit2_init();
+
+    const char *repo_path = ".";
+    time_t since = 0;
+    const char *author = nullptr;
+    bool no_merges = false;
+    if (argc > 1) {
+        repo_path = argv[1];
+        for (int i = 2; i < argc; i++) {
+            if (std::string(argv[i]) == "--since") {
+                if (since != 0) {
+                    std::cerr << "Since date specified more than once" << std::endl;
+                    return 1;
+                }
+                if (i + 1 >= argc || std::string(argv[i + 1]).substr(0, 2) == "--") {
+                    std::cerr << "Missing since date" << std::endl;
+                    return 1;
+                }
+                std::tm tmStruct = {};
+                std::istringstream ss(argv[i + 1]);
+                ss >> std::get_time(&tmStruct, "%Y-%m-%d_%H:%M:%S");
+                if (ss.fail()) {
+                    std::cerr << "Invalid date format: " << argv[i + 1] << std::endl;
+                    return 1;
+                }
+                since = std::mktime(&tmStruct);
+                std::cout << "Since: " << format_time(since) << std::endl;
+                i++;
+                continue;
+            }
+
+            if (std::string(argv[i]) == "--author") {
+                if (author != nullptr) {
+                    std::cerr << "Author: Firstname Lastname specified more than once" << std::endl;
+                    return 1;
+                }
+                if (i + 1 >= argc || std::string(argv[i + 1]).substr(0, 2) == "--") {
+                    std::cerr << "Missing author" << std::endl;
+                    return 1;
+                }
+                author = argv[i + 1];
+                std::cout << "Author: " << author << std::endl;
+                i++;
+                continue;
+            }
+
+            if (std::string(argv[i]) == "--no-merges") {
+                no_merges = true;
+                std::cout << "No merges" << std::endl;
+                continue;
+            }
+        }
+    }
+    
+    int error = analis(repo_path);
+    if (error != 0) {
+        return error;
+    }
 
     git_libgit2_shutdown();
     return 0;
