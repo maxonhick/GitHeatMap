@@ -14,46 +14,57 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-        include:
-          - os: windows-latest
-            generator: "Visual Studio 17 2022"
-            arch: "-A x64"
-          - os: ubuntu-latest
-            generator: "Unix Makefiles"
-          - os: macos-latest
-            generator: "Unix Makefiles"
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # Installing libgit2 on Linux and macOS
-      - name: Install libgit2 (Linux)
+      - name: Install dependencies (Linux)
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y libgit2-dev
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgit2-dev pkg-config ninja-build
 
-      - name: Install libgit2 (macOS)
+      - name: Install dependencies (macOS)
         if: runner.os == 'macOS'
-        run: brew install libgit2
+        run: |
+          brew update
+          brew install libgit2 pkg-config ninja
 
-      - name: Install libgit2 (Windows)
+      - name: Install dependencies (Windows)
         if: runner.os == 'Windows'
         run: |
+          choco install ninja
           git clone https://github.com/Microsoft/vcpkg.git
           cd vcpkg
           .\bootstrap-vcpkg.bat
           .\vcpkg install libgit2:x64-windows
+          echo "VCPKG_ROOT=$env:GITHUB_WORKSPACE/vcpkg" >> $env:GITHUB_ENV
+        shell: pwsh
 
-      - name: Configure CMake
+      - name: Configure CMake (Linux/macOS)
+        if: runner.os != 'Windows'
         run: |
-          cmake -B build -G "${{ matrix.generator }}" ${{ matrix.arch }} -DCMAKE_CXX_STANDARD=17
+          cmake -B build -G Ninja -DCMAKE_CXX_STANDARD=17
         shell: bash
+
+      - name: Configure CMake (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          cmake -B build -G Ninja `
+            -DCMAKE_CXX_STANDARD=17 `
+            -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake"
+        shell: pwsh
 
       - name: Build
         run: cmake --build build --config Release
 
-      - name: Upload build artifacts (for debugging)
+      - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
           name: ${{ runner.os }}-build
-          path: ${{ github.workspace }}/build/
+          path: |
+            build/
+            !build/**/*.pdb
+            !build/**/*.ilk
+            !build/**/*.exp
