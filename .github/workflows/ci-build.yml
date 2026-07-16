@@ -1,0 +1,58 @@
+name: CI Build
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  pull_request:
+    branches: [ "main", "master" ]
+
+jobs:
+  build:
+    name: Build on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        include:
+          - os: windows-latest
+            generator: "Visual Studio 17 2022"
+            arch: "x64"
+          - os: ubuntu-latest
+            generator: "Unix Makefiles"
+          - os: macos-latest
+            generator: "Unix Makefiles"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # Installing libgit2 on Linux and macOS
+      - name: Install libgit2 (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libgit2-dev
+
+      - name: Install libgit2 (macOS)
+        if: runner.os == 'macOS'
+        run: brew install libgit2
+
+      - name: Configure CMake
+        uses: threeal/cmake-action@v1.3.0
+        with:
+          source-dir: ${{ github.workspace }}
+          build-dir: ${{ github.workspace }}/build
+          generator: ${{ matrix.generator }}
+          options: |
+            CMAKE_CXX_STANDARD=17
+            # Здесь можно передать любые другие опции
+            # Например, если вы используете vcpkg:
+            # CMAKE_TOOLCHAIN_FILE=${{ env.VCPKG_ROOT }}/scripts/buildsystems/vcpkg.cmake
+
+      - name: Build the project
+        run: cmake --build ${{ github.workspace }}/build --config Release
+
+      - name: Upload build artifacts (for debugging)
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ runner.os }}-build
+          path: ${{ github.workspace }}/build/

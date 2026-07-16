@@ -1,5 +1,5 @@
 #include <iostream>
-#include <string>
+#include <cstring>
 #include <map>
 #include "git2.h"
 #include <iomanip>
@@ -36,7 +36,7 @@ int diff_callback(
     return 0;
 }
 
-int analis(const char *repo_path) {
+int analis(const char *repo_path, time_t since, const char *commit_author, bool no_merges) {
     git_repository *repo = nullptr;
     int error = git_repository_open(&repo, repo_path);
     if (error < 0) {
@@ -69,6 +69,18 @@ int analis(const char *repo_path) {
         time_t commit_time = git_commit_time(commit);
         std::string commit_hash = git_oid_tostr_s(&oid);
 
+        if (since != 0 &&commit_time < since) {
+            git_commit_free(commit);
+            break;
+        }
+
+        if (commit_author != nullptr && 
+            strcmp(commit_author, author->name) != 0 && 
+            strcmp(commit_author, author->email) != 0) {
+            git_commit_free(commit);
+            continue;
+        }
+
         git_tree *tree = nullptr;
         git_tree *parent_tree = nullptr;
 
@@ -80,6 +92,12 @@ int analis(const char *repo_path) {
 
         unsigned int parent_count = git_commit_parentcount(commit);
         git_diff *diff = nullptr;
+        
+        if (no_merges && parent_count > 1) {
+            git_commit_free(commit);
+            continue;
+        }
+
         if (parent_count > 0) {
             git_commit *parent_commit = nullptr;
             error = git_commit_parent(&parent_commit, commit, 0);
@@ -211,7 +229,7 @@ int main(int argc, char *argv[]) {
         }
     }
     
-    int error = analis(repo_path);
+    int error = analis(repo_path, since, author, no_merges);
     if (error != 0) {
         return error;
     }

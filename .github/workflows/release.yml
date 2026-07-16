@@ -1,0 +1,71 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    name: Build and archive for ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        include:
+          - os: ubuntu-latest
+            artifact_name: git-heatmap
+            asset_name: git-heatmap-linux-x86_64
+          - os: windows-latest
+            artifact_name: git-heatmap.exe
+            asset_name: git-heatmap-windows-x86_64
+          - os: macos-latest
+            artifact_name: git-heatmap
+            asset_name: git-heatmap-macos-universal
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # Installing libgit2 on Linux and macOS
+      - name: Install libgit2 (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libgit2-dev
+
+      - name: Install libgit2 (macOS)
+        if: runner.os == 'macOS'
+        run: brew install libgit2
+
+      - name: Configure CMake
+        uses: threeal/cmake-action@v1.3.0
+        with:
+          source-dir: ${{ github.workspace }}
+          build-dir: ${{ github.workspace }}/build
+          options: |
+            CMAKE_CXX_STANDARD=17
+
+      - name: Build the project
+        run: cmake --build ${{ github.workspace }}/build --config Release
+
+      # Creating an archive with a binary file
+      - name: Create archive
+        shell: bash
+        run: |
+          cd ${{ github.workspace }}/build/
+          # На Windows бинарник лежит в папке Release
+          if [ "${{ runner.os }}" == "Windows" ]; then
+            cd Release/
+          fi
+          mkdir -p ${{ github.workspace }}/dist
+          cp ${{ matrix.artifact_name }} ${{ github.workspace }}/dist/
+          cd ${{ github.workspace }}
+          tar -czf ${{ matrix.asset_name }}.tar.gz -C dist .
+
+      - name: Upload archive to release
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: ${{ matrix.asset_name }}.tar.gz
+          asset_name: ${{ matrix.asset_name }}.tar.gz
+          tag: ${{ github.ref }}
+          overwrite: true
