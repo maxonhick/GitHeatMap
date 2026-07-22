@@ -52,7 +52,6 @@ jobs:
         shell: bash
         run: |
           cd ${{ github.workspace }}/build/
-          # На Windows бинарник лежит в папке Release
           if [ "${{ runner.os }}" == "Windows" ]; then
             cd Release/
           fi

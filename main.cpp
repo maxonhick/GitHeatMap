@@ -18,7 +18,7 @@ struct FileStat {
 std::string format_time(time_t t) {
     std::tm* tm = std::localtime(&t);
     std::ostringstream oss;
-    oss << std::put_time(tm, "%Y-%m-%d_%H:%M:%S");
+    oss << std::put_time(tm, "%Y-%m-%d %H:%M:%S");
     return oss.str();
 }
 
@@ -176,8 +176,88 @@ int analis(const char *repo_path, time_t since, const char *commit_author, bool 
     return 0;
 }
 
+std::pair<int, time_t> GetTime(std::vector<std::string> &date) {
+    switch (date.size()) {
+    case 1: // yesterday/today/now or date format YYYY-MM-DD
+        {
+            if (date[0] == "yesterday") {
+                return std::pair(0, (time(nullptr) / 86400 - 1) * 86400);
+            }
+            if (date[0] == "today") {
+                return std::pair(0, time(nullptr) / 86400 * 86400);
+            }
+            if (date[0] == "now") {
+                return std::pair(0, time(nullptr));
+            }
+            std::tm tmStruct = {};
+            std::istringstream ss(date[0]);
+            ss >> std::get_time(&tmStruct, "%Y-%m-%d");
+            if (ss.fail())
+                return std::pair(1, 0);
+            return std::pair(0, mktime(&tmStruct));
+        }
+        break;
+    case 2: // last hour, day, week, month, year or date format YYYY-MM-DD HH:MM(:SS)
+        {
+            if (date[0] == "last") {
+                if (date[1] == "hour") {
+                    return std::pair(0, time(nullptr) - 3600);
+                }
+                if (date[1] == "day") {
+                    return std::pair(0, time(nullptr) - 86400);
+                }
+                if (date[1] == "week") {
+                    return std::pair(0, time(nullptr) - 604800);
+                }
+                if (date[1] == "month") {
+                    return std::pair(0, time(nullptr) - 2592000);
+                }
+                if (date[1] == "year") {
+                    return std::pair(0, time(nullptr) - 31536000);
+                }
+                return std::pair(1, 0);
+            }
+            std::tm tmStruct = {};
+            std::istringstream ss(date[0] + " " + date[1]);
+            if (std::count(date[1].begin(), date[1].end(), ':') == 1) // date format YYYY-MM-DD HH:MM
+                ss >> std::get_time(&tmStruct, "%Y-%m-%d %H:%M");
+            else
+                ss >> std::get_time(&tmStruct, "%Y-%m-%d %H:%M:%S");
+            if (ss.fail())
+                return std::pair(1, 0);
+            return std::pair(0, mktime(&tmStruct));
+        }
+        break;
+    case 3: // X (hours, days, weeks, months or years) ago
+        {
+            try {
+                if (date[1] == "hour") {
+                    return std::pair(0, time(nullptr) - std::stoi(date[0]) * 3600);
+                }
+                if (date[1] == "day") {
+                    return std::pair(0, time(nullptr) / 86400 * 86400 - std::stoi(date[0]) * 86400);
+                }
+                if (date[1] == "week") {
+                    return std::pair(0, time(nullptr) / 86400 * 86400 - std::stoi(date[0]) * 604800);
+                }
+                if (date[1] == "month") {
+                    return std::pair(0, time(nullptr) / 86400 * 86400 - std::stoi(date[0]) * 2592000);
+                }
+                if (date[1] == "year") {
+                    return std::pair(0, time(nullptr) / 86400 * 86400 - std::stoi(date[0]) * 31536000);
+                }
+                return std::pair(1, 0);
+            } catch (...) {
+                return std::pair(1, 0);
+            }
+        }
+    }
+    return std::pair(1, 0);
+}
+
 int main(int argc, char *argv[]) {
     git_libgit2_init();
+    int error;
 
     const char *repo_path = ".";
     time_t since = 0;
@@ -195,14 +275,17 @@ int main(int argc, char *argv[]) {
                     std::cerr << "Missing since date" << std::endl;
                     return 1;
                 }
-                std::tm tmStruct = {};
-                std::istringstream ss(argv[i + 1]);
-                ss >> std::get_time(&tmStruct, "%Y-%m-%d_%H:%M:%S");
-                if (ss.fail()) {
-                    std::cerr << "Invalid date format: " << argv[i + 1] << std::endl;
+                std::vector<std::string> date;
+                while (i + 1 < argc && std::string(argv[i + 1]).substr(0, 2) != "--") {
+                    date.push_back(argv[i + 1]);
+                    i++;
+                }
+                std::pair<int, time_t> result = GetTime(date);
+                if (result.first != 0) {
+                    std::cerr << "Invalid since date" << std::endl;
                     return 1;
                 }
-                since = std::mktime(&tmStruct);
+                since = result.second;
                 std::cout << "Since: " << format_time(since) << std::endl;
                 i++;
                 continue;
@@ -233,7 +316,7 @@ int main(int argc, char *argv[]) {
 
     std::cout << "Репозиторий: " << repo_path << std::endl;
     
-    int error = analis(repo_path, since, author, no_merges);
+    error = analis(repo_path, since, author, no_merges);
     if (error != 0) {
         return error;
     }
