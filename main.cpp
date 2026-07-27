@@ -65,27 +65,24 @@ int analis(const char *repo_path, time_t since, time_t until, const char *commit
             continue;
         }
 
-        if (until != 0 && git_commit_time(commit) > until) {
-            continue;
-        }
-
-        commit_total_count++;
-
         const git_signature *author = git_commit_author(commit);
         time_t commit_time = git_commit_time(commit);
         std::string commit_hash = git_oid_tostr_s(&oid);
+
+        if (until != 0 && git_commit_time(commit) > until) {
+            continue;
+        }
 
         if (since != 0 && commit_time < since) {
             git_commit_free(commit);
             break;
         }
 
-        if (commit_author != nullptr && 
-            strcmp(commit_author, author->name) != 0 && 
-            strcmp(commit_author, author->email) != 0) {
-            git_commit_free(commit);
+        if (commit_author != nullptr && !check_author(commit_author, author->email, author->name)) {
             continue;
         }
+
+        commit_total_count++;
 
         git_tree *tree = nullptr;
         git_tree *parent_tree = nullptr;
@@ -150,7 +147,6 @@ int analis(const char *repo_path, time_t since, time_t until, const char *commit
         git_tree_free(tree);
         git_commit_free(commit);
     }
-    commit_total_count--;
 
     std::cout << "Всего коммитов обработано: " << commit_total_count << std::endl;
     std::cout << "Уникальных файлов затронуто: " << file_stats.size() << "\n" << std::endl;
@@ -179,6 +175,23 @@ int analis(const char *repo_path, time_t since, time_t until, const char *commit
     git_revwalk_free(revwalk);
     git_repository_free(repo);
     return 0;
+}
+
+/// @brief Checks whether the author fits the filter
+/// @param author The introduced filter
+/// @param email Email address of the commit author
+/// @param name Name of the commit author
+/// @return True if author is valid
+bool check_author(const std::string &author, const std::string &email, const std::string &name) {
+    std::string email_lower = email;
+    std::string name_lower = name;
+    std::string author_lower = author;
+    
+    std::transform(email_lower.begin(), email_lower.end(), email_lower.begin(), [](unsigned char c) { return std::tolower(c); });
+    std::transform(name_lower.begin(), name_lower.end(), name_lower.begin(), [](unsigned char c) { return std::tolower(c); });
+    std::transform(author_lower.begin(), author_lower.end(), author_lower.begin(), [](unsigned char c) { return std::tolower(c); });
+
+    return (email_lower.find(author_lower) != std::string::npos || name_lower.find(author_lower) != std::string::npos);
 }
 
 std::pair<int, time_t> GetTime(std::vector<std::string> &date) {
