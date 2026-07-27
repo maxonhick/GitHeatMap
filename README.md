@@ -46,8 +46,8 @@
 |---------|--------|------------|
 | **Ядро анализа** | ✅ Готово | Обход коммитов, сбор статистики по файлам |
 | **CLI: табличный вывод** | ✅ Готово | Топ-файлов с сортировкой |
-| **CLI: фильтр `--since`** | ✅ Готово | Поддерживаемые форматы дат: "yesterday", "today", "now", "YYYY-MM-DD", "last hour/day/week/month/year", "YYYY-MM-DD HH:MM", "YYYY-MM-DD HH:MM:SS", X hour/day/week/month/year ago |
-| **CLI: фильтр `--until`** | ❌ Запланировано |  |
+| **CLI: фильтр `--since`** | ✅ Готово | Поддерживаемые форматы дат: "YYYY-MM-DD", "YYYY-MM-DD HH:MM", "YYYY-MM-DD HH:MM:SS", "yesterday", "today", "now", "last hour/day/week/month/year", "X hour/day/week/month/year ago" |
+| **CLI: фильтр `--until`** | ✅ Готово | Те же форматы дат, что и в '--since' + условие, что until >= since |
 | **CLI: фильтр `--author`** | 🚧 В разработке | Полное совпадение |
 | **CLI: фильтр `--no-merges`** | ✅ Готово | Игнорирование merge-коммитов |
 | **CLI: фильтр `--top N`** | 🚧 В разработке | Ограничение количества файлов |

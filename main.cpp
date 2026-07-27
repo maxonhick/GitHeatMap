@@ -38,7 +38,7 @@ int diff_callback(
     return 0;
 }
 
-int analis(const char *repo_path, time_t since, const char *commit_author, bool no_merges) {
+int analis(const char *repo_path, time_t since, time_t until, const char *commit_author, bool no_merges) {
     git_repository *repo = nullptr;
     int error = git_repository_open(&repo, repo_path);
     if (error < 0) {
@@ -65,13 +65,17 @@ int analis(const char *repo_path, time_t since, const char *commit_author, bool 
             continue;
         }
 
+        if (until != 0 && git_commit_time(commit) > until) {
+            continue;
+        }
+
         commit_total_count++;
 
         const git_signature *author = git_commit_author(commit);
         time_t commit_time = git_commit_time(commit);
         std::string commit_hash = git_oid_tostr_s(&oid);
 
-        if (since != 0 &&commit_time < since) {
+        if (since != 0 && commit_time < since) {
             git_commit_free(commit);
             break;
         }
@@ -146,6 +150,7 @@ int analis(const char *repo_path, time_t since, const char *commit_author, bool 
         git_tree_free(tree);
         git_commit_free(commit);
     }
+    commit_total_count--;
 
     std::cout << "Всего коммитов обработано: " << commit_total_count << std::endl;
     std::cout << "Уникальных файлов затронуто: " << file_stats.size() << "\n" << std::endl;
@@ -261,6 +266,7 @@ int main(int argc, char *argv[]) {
 
     const char *repo_path = ".";
     time_t since = 0;
+    time_t until = 0;
     const char *author = nullptr;
     bool no_merges = false;
     if (argc > 1) {
@@ -287,7 +293,38 @@ int main(int argc, char *argv[]) {
                 }
                 since = result.second;
                 std::cout << "Since: " << format_time(since) << std::endl;
-                i++;
+                if (since != 0 && until != 0 && until < since) {
+                    std::cerr << "Until date must be greater than since date" << std::endl;
+                    return 1;
+                }
+                continue;
+            }
+
+            if (std::string(argv[i]) == "--until") {
+                if (until != 0) {
+                    std::cerr << "Until date specified more than once" << std::endl;
+                    return 1;
+                }
+                if (i + 1 >= argc || std::string(argv[i + 1]).substr(0, 2) == "--") {
+                    std::cerr << "Missing until date" << std::endl;
+                    return 1;
+                }
+                std::vector<std::string> date;
+                while (i + 1 < argc && std::string(argv[i + 1]).substr(0, 2) != "--") {
+                    date.push_back(argv[i + 1]);
+                    i++;
+                }
+                std::pair<int, time_t> result = GetTime(date);
+                if (result.first != 0) {
+                    std::cerr << "Invalid since date" << std::endl;
+                    return 1;
+                }
+                until = result.second;
+                std::cout << "Until: " << format_time(until) << std::endl;
+                if (since != 0 && until != 0 && until < since) {
+                    std::cerr << "Until date must be greater than since date" << std::endl;
+                    return 1;
+                }
                 continue;
             }
 
@@ -311,12 +348,15 @@ int main(int argc, char *argv[]) {
                 std::cout << "No merges" << std::endl;
                 continue;
             }
+
+            std::cerr << "Unknown argument: " << argv[i] << std::endl;
+            return 1;
         }
     }
 
-    std::cout << "Репозиторий: " << repo_path << std::endl;
+    std::cout << "\n\nРепозиторий: " << repo_path << std::endl;
     
-    error = analis(repo_path, since, author, no_merges);
+    error = analis(repo_path, since, until, author, no_merges);
     if (error != 0) {
         return error;
     }
