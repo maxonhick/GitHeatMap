@@ -14,13 +14,13 @@ jobs:
         os: [ubuntu-latest, windows-latest, macos-latest]
         include:
           - os: ubuntu-latest
-            artifact_name: git-heatmap
+            artifact_name: GitHeatmap
             asset_name: git-heatmap-linux-x86_64
           - os: windows-latest
-            artifact_name: git-heatmap.exe
+            artifact_name: GitHeatMap.exe
             asset_name: git-heatmap-windows-x86_64
           - os: macos-latest
-            artifact_name: git-heatmap
+            artifact_name: GitHeatMap
             asset_name: git-heatmap-macos-universal
 
     steps:
