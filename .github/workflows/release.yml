@@ -50,12 +50,22 @@ jobs:
       - name: Create archive
         shell: bash
         run: |
-          cd ${{ github.workspace }}/build/
+          BINARY_PATH="${{ github.workspace }}/build"
+          
           if [ "${{ runner.os }}" == "Windows" ]; then
-            cd Release/
+            BINARY_PATH="$BINARY_PATH/Release"
           fi
+          
+          if [ ! -f "$BINARY_PATH/${{ matrix.artifact_name }}" ]; then
+            echo "Ошибка: Файл ${{ matrix.artifact_name }} не найден в $BINARY_PATH"
+            echo "Содержимое директории:"
+            ls -la "$BINARY_PATH" || true
+            exit 1
+          fi
+          
           mkdir -p ${{ github.workspace }}/dist
-          cp ${{ matrix.artifact_name }} ${{ github.workspace }}/dist/
+          cp "$BINARY_PATH/${{ matrix.artifact_name }}" ${{ github.workspace }}/dist/
+          
           cd ${{ github.workspace }}
           tar -czf ${{ matrix.asset_name }}.tar.gz -C dist .
 
