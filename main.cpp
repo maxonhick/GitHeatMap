@@ -55,7 +55,7 @@ bool check_author(const std::string &author, const std::string &email, const std
     return (email_lower.find(author_lower) != std::string::npos || name_lower.find(author_lower) != std::string::npos);
 }
 
-int analis(const char *repo_path, time_t since, time_t until, const char *commit_author, bool no_merges) {
+int analis(const char *repo_path, time_t since, time_t until, const char *commit_author, bool no_merges, int top) {
     git_repository *repo = nullptr;
     int error = git_repository_open(&repo, repo_path);
     if (error < 0) {
@@ -174,14 +174,15 @@ int analis(const char *repo_path, time_t since, time_t until, const char *commit
             return a.second.commit_count > b.second.commit_count;
         });
     
-    std::cout << "=== Топ-10 самых часто изменяемых файлов ===\n";
+    top = std::min(top, static_cast<int>(sorted_stats.size()));
+    std::cout << "=== Топ-" << top << " самых часто изменяемых файлов ===\n";
     std::cout << std::left << std::setw(9) << "Коммиты"
               << std::setw(60) << "Файл"
               << std::setw(20) << "Последнее изменение"
               << std::endl;
     std::cout << std::string(88, '-') << std::endl;
     
-    for (size_t i = 0; i < std::min<size_t>(10, sorted_stats.size()); ++i) {
+    for (size_t i = 0; i < top; ++i) {
         const auto& [path, fs] = sorted_stats[i];
         std::cout << std::left << std::setw(8) << fs.commit_count
                   << std::setw(60) << (path.length() > 57 ? path.substr(0, 54) + "..." : path)
@@ -282,6 +283,7 @@ int main(int argc, char *argv[]) {
     time_t until = 0;
     const char *author = nullptr;
     bool no_merges = false;
+    int top = 10;
     if (argc > 1) {
         repo_path = argv[1];
         for (int i = 2; i < argc; i++) {
@@ -362,6 +364,26 @@ int main(int argc, char *argv[]) {
                 continue;
             }
 
+            if (std::string(argv[i]) == "--top") {
+                if (i + 1 >= argc || std::string(argv[i + 1]).substr(0, 2) == "--") {
+                    std::cerr << "Missing top number" << std::endl;
+                    return 1;
+                }
+                try {
+                    top = std::stoi(argv[i + 1]);
+                    if (top <= 0) {
+                        std::cerr << "Top number must be greater than zero" << std::endl;
+                        return 1;
+                    }
+                } catch (...) {
+                    std::cerr << "Invalid top number" << std::endl;
+                    return 1;
+                }
+                std::cout << "Top: " << top << std::endl;
+                i++;
+                continue;
+            }
+
             std::cerr << "Unknown argument: " << argv[i] << std::endl;
             return 1;
         }
@@ -369,7 +391,7 @@ int main(int argc, char *argv[]) {
 
     std::cout << "\n\nРепозиторий: " << repo_path << std::endl;
     
-    error = analis(repo_path, since, until, author, no_merges);
+    error = analis(repo_path, since, until, author, no_merges, top);
     if (error != 0) {
         return error;
     }
