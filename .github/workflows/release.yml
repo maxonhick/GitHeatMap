@@ -26,41 +26,45 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # Installing libgit2 on Linux
-      - name: Install libgit2 (Linux)
+      - name: Install dependencies (Linux)
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y libgit2-dev
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgit2-dev pkg-config ninja-build
 
-      # Installing libgit2 on macOS
-      - name: Install libgit2 (macOS)
+      - name: Install dependencies (macOS)
         if: runner.os == 'macOS'
         run: |
-          brew install libgit2
-          echo "LIBGIT2_ROOT=$(brew --prefix libgit2)" >> $GITHUB_ENV
+          brew update
+          brew install libgit2 pkg-config ninja
 
-      # Installing libgit2 on Windows using vcpkg
-      - name: Install vcpkg and libgit2 (Windows)
+      - name: Install dependencies (Windows)
         if: runner.os == 'Windows'
         run: |
-          git clone https://github.com/microsoft/vcpkg.git C:\vcpkg
-          cd C:\vcpkg
+          choco install ninja
+          git clone https://github.com/Microsoft/vcpkg.git
+          cd vcpkg
           .\bootstrap-vcpkg.bat
-          .\vcpkg.exe install libgit2:x64-windows
+          .\vcpkg install libgit2:x64-windows
+          echo "VCPKG_ROOT=$env:GITHUB_WORKSPACE/vcpkg" >> $env:GITHUB_ENV
         shell: pwsh
 
-      - name: Configure CMake
-        uses: threeal/cmake-action@v1.3.0
-        with:
-          source-dir: ${{ github.workspace }}
-          build-dir: ${{ github.workspace }}/build
-          options: >
-            CMAKE_CXX_STANDARD=17
-            CMAKE_BUILD_TYPE=Release
-            ${{ runner.os == 'Windows' && 'CMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake' || '' }}
-            ${{ runner.os == 'macOS' && format('LIBGIT2_ROOT={0}', env.LIBGIT2_ROOT) || '' }}
+      - name: Configure CMake (Linux/macOS)
+        if: runner.os != 'Windows'
+        run: |
+          cmake -B build -G Ninja -DCMAKE_CXX_STANDARD=17
+        shell: bash
 
-      - name: Build the project
-        run: cmake --build ${{ github.workspace }}/build --config Release
+      - name: Configure CMake (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          cmake -B build -G Ninja `
+            -DCMAKE_CXX_STANDARD=17 `
+            -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake"
+        shell: pwsh
+
+      - name: Build
+        run: cmake --build build --config Release
 
       # Creating an archive with a binary file
       - name: Create archive
