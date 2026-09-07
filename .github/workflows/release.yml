@@ -26,14 +26,17 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # Installing libgit2 on Linux and macOS
+      # Installing libgit2 on Linux
       - name: Install libgit2 (Linux)
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y libgit2-dev
 
+      # Installing libgit2 on macOS
       - name: Install libgit2 (macOS)
         if: runner.os == 'macOS'
-        run: brew install libgit2
+        run: |
+          brew install libgit2
+          echo "LIBGIT2_ROOT=$(brew --prefix libgit2)" >> $GITHUB_ENV
 
       # Installing libgit2 on Windows using vcpkg
       - name: Install vcpkg and libgit2 (Windows)
@@ -54,6 +57,7 @@ jobs:
             CMAKE_CXX_STANDARD=17
             CMAKE_BUILD_TYPE=Release
             ${{ runner.os == 'Windows' && 'CMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake' || '' }}
+            ${{ runner.os == 'macOS' && format('LIBGIT2_ROOT={0}', env.LIBGIT2_ROOT) || '' }}
 
       - name: Build the project
         run: cmake --build ${{ github.workspace }}/build --config Release
