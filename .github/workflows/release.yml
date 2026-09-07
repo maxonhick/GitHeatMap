@@ -1,13 +1,10 @@
 name: Release
-
 on:
   push:
     tags:
       - 'v*'
-
 permissions:
   contents: write
-
 jobs:
   build:
     name: Build and archive for ${{ matrix.os }}
@@ -25,7 +22,6 @@ jobs:
           - os: macos-latest
             artifact_name: GitHeatMap
             asset_name: git-heatmap-macos-universal
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -39,14 +35,15 @@ jobs:
         if: runner.os == 'macOS'
         run: brew install libgit2
 
-      - name: Install libgit2 (Windows)
+      # Installing libgit2 on Windows using vcpkg
+      - name: Install vcpkg and libgit2 (Windows)
         if: runner.os == 'Windows'
         run: |
-          git clone https://github.com/microsoft/vcpkg.git
+          git clone https://github.com/microsoft/vcpkg.git C:\vcpkg
           cd C:\vcpkg
-          ./bootstrap-vcpkg.bat
-          ./vcpkg.exe install libgit2:x64-windows
-          echo "VCPKG_ROOT=$(pwd)" >> $GITHUB_ENV
+          .\bootstrap-vcpkg.bat
+          .\vcpkg.exe install libgit2:x64-windows
+        shell: pwsh
 
       - name: Configure CMake
         uses: threeal/cmake-action@v1.3.0
@@ -54,7 +51,7 @@ jobs:
           source-dir: ${{ github.workspace }}
           build-dir: ${{ github.workspace }}/build
           options: >
-            CMAKE_CXX_STANDARD=17 
+            CMAKE_CXX_STANDARD=17
             CMAKE_BUILD_TYPE=Release
             ${{ runner.os == 'Windows' && 'CMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake' || '' }}
 
@@ -66,21 +63,17 @@ jobs:
         shell: bash
         run: |
           BINARY_PATH="${{ github.workspace }}/build"
-          
           if [ "${{ runner.os }}" == "Windows" ]; then
             BINARY_PATH="$BINARY_PATH/Release"
           fi
-          
           if [ ! -f "$BINARY_PATH/${{ matrix.artifact_name }}" ]; then
             echo "Ошибка: Файл ${{ matrix.artifact_name }} не найден в $BINARY_PATH"
             echo "Содержимое директории:"
             ls -la "$BINARY_PATH" || true
             exit 1
           fi
-          
           mkdir -p ${{ github.workspace }}/dist
           cp "$BINARY_PATH/${{ matrix.artifact_name }}" ${{ github.workspace }}/dist/
-          
           cd ${{ github.workspace }}
           tar -czf ${{ matrix.asset_name }}.tar.gz -C dist .
 
