@@ -39,12 +39,24 @@ jobs:
         if: runner.os == 'macOS'
         run: brew install libgit2
 
+      - name: Install libgit2 (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          git clone https://github.com/microsoft/vcpkg.git
+          cd C:\vcpkg
+          ./bootstrap-vcpkg.bat
+          ./vcpkg.exe install libgit2:x64-windows
+          echo "VCPKG_ROOT=$(pwd)" >> $GITHUB_ENV
+
       - name: Configure CMake
         uses: threeal/cmake-action@v1.3.0
         with:
           source-dir: ${{ github.workspace }}
           build-dir: ${{ github.workspace }}/build
-          options: CMAKE_CXX_STANDARD=17 CMAKE_BUILD_TYPE=Release
+          options: >
+            CMAKE_CXX_STANDARD=17 
+            CMAKE_BUILD_TYPE=Release
+            ${{ runner.os == 'Windows' && 'CMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake' || '' }}
 
       - name: Build the project
         run: cmake --build ${{ github.workspace }}/build --config Release
