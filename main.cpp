@@ -6,6 +6,8 @@
 #include "git2.h"
 #include <iomanip>
 #include <ctime>
+#include <cctype>
+#include <fstream>
 #include <sstream>
 
 struct FileStat {
@@ -13,6 +15,13 @@ struct FileStat {
     time_t last_change_time = 0;
     std::string last_commit_hash;
     std::string last_commit_author;
+};
+
+enum class OutPutFormat {
+    CSV,
+    JSON,
+    TABLE,
+    HTML
 };
 
 std::string format_time(time_t t) {
@@ -38,6 +47,8 @@ int diff_callback(
     return 0;
 }
 
+
+
 /// @brief Checks whether the author fits the filter
 /// @param author The introduced filter
 /// @param email Email address of the commit author
@@ -55,7 +66,81 @@ bool check_author(const std::string &author, const std::string &email, const std
     return (email_lower.find(author_lower) != std::string::npos || name_lower.find(author_lower) != std::string::npos);
 }
 
-int analis(const char *repo_path, time_t since, time_t until, const char *commit_author, bool no_merges, int top) {
+void PrintStats(const std::vector<std::pair<std::string, FileStat>> &file_stats, int top, OutPutFormat format) {
+    switch (format) {
+        case OutPutFormat::TABLE: {
+            std::cout << "=== Топ-" << top << " самых часто изменяемых файлов ===\n";
+            std::cout << std::left << std::setw(20) << "Коммиты"
+                    << std::setw(60) << "Файл"
+                    << std::setw(20) << "Последнее изменение"
+                    << std::endl;
+            std::cout << std::string(88, '-') << std::endl;
+            
+            for (size_t i = 0; i < top; ++i) {
+                const auto& [path, fs] = file_stats[i];
+                std::cout << std::left << std::setw(8) << fs.commit_count
+                        << std::setw(60) << (path.length() > 57 ? path.substr(0, 54) + "..." : path)
+                        << std::setw(20) << format_time(fs.last_change_time)
+                        << std::endl;
+            }
+            break;
+        }
+        case OutPutFormat::CSV: {
+            std::ofstream file("stats.csv");
+            file << "Коммиты,Файл,Последнее изменение\n";
+            for (size_t i = 0; i < top; ++i) {
+                const auto& [path, fs] = file_stats[i];
+                file << fs.commit_count << "," << path << "," << format_time(fs.last_change_time) << "\n";
+            }
+            std::cout << "=== Статистика сохранена в stats.csv ===\n";
+            file.close();
+            break;
+        }
+        case OutPutFormat::JSON: {
+            std::ofstream file("stats.json");
+            file << "[\n";
+            for (size_t i = 0; i < top; ++i) {
+                const auto& [path, fs] = file_stats[i];
+                file << "    {\n";
+                file << "        \"commit_count\": " << fs.commit_count << ",\n";
+                file << "        \"path\": \"" << path << "\",\n";
+                file << "        \"last_change_time\": \"" << format_time(fs.last_change_time) << "\"\n";
+                if (i == top - 1) {
+                    file << "    }\n";
+                    continue;
+                }
+                file << "    },\n";
+            }
+            file << "]\n";
+            std::cout << "=== Статистика сохранена в stats.json ===\n";
+            file.close();
+            break;
+        }
+        case OutPutFormat::HTML: {
+            std::ofstream file("stats.html");
+            file << "<table>\n";
+            file << "    <tr>\n";
+            file << "        <th>Коммиты</th>\n";
+            file << "        <th>Файл</th>\n";
+            file << "        <th>Последнее изменение</th>\n";
+            file << "    </tr>\n";
+            for (size_t i = 0; i < top; ++i) {
+                const auto& [path, fs] = file_stats[i];
+                file << "    <tr>\n";
+                file << "        <td>" << fs.commit_count << "</td>\n";
+                file << "        <td>" << (path.length() > 57 ? path.substr(0, 54) + "..." : path) << "</td>\n";
+                file << "        <td>" << format_time(fs.last_change_time) << "</td>\n";
+                file << "    </tr>\n";
+            }
+            file << "</table>\n";
+            std::cout << "=== Статистика сохранена в stats.html ===\n";
+            file.close();
+            break;
+        }
+    }
+}
+
+int analis(const char *repo_path, time_t since, time_t until, const char *commit_author, bool no_merges, int top, OutPutFormat format) {
     git_repository *repo = nullptr;
     int error = git_repository_open(&repo, repo_path);
     if (error < 0) {
@@ -175,20 +260,7 @@ int analis(const char *repo_path, time_t since, time_t until, const char *commit
         });
     
     top = std::min(top, static_cast<int>(sorted_stats.size()));
-    std::cout << "=== Топ-" << top << " самых часто изменяемых файлов ===\n";
-    std::cout << std::left << std::setw(9) << "Коммиты"
-              << std::setw(60) << "Файл"
-              << std::setw(20) << "Последнее изменение"
-              << std::endl;
-    std::cout << std::string(88, '-') << std::endl;
-    
-    for (size_t i = 0; i < top; ++i) {
-        const auto& [path, fs] = sorted_stats[i];
-        std::cout << std::left << std::setw(8) << fs.commit_count
-                  << std::setw(60) << (path.length() > 57 ? path.substr(0, 54) + "..." : path)
-                  << std::setw(20) << format_time(fs.last_change_time)
-                  << std::endl;
-    }
+    PrintStats(sorted_stats, top, format);
     
     git_revwalk_free(revwalk);
     git_repository_free(repo);
@@ -284,6 +356,7 @@ int main(int argc, char *argv[]) {
     const char *author = nullptr;
     bool no_merges = false;
     int top = 10;
+    OutPutFormat format = OutPutFormat::TABLE;
     if (argc > 1) {
         repo_path = argv[1];
         for (int i = 2; i < argc; i++) {
@@ -384,6 +457,26 @@ int main(int argc, char *argv[]) {
                 continue;
             }
 
+            if (std::string(argv[i]).size() > 9 && std::string(argv[i]).substr(0, 9) == "--format=") {
+                std::string form = std::string(argv[i]).substr(9);
+                std::transform(form.begin(), form.end(), form.begin(), ::tolower);
+
+                if (form == "json") {
+                    format = OutPutFormat::JSON;
+                } else if (form == "csv") {
+                    format = OutPutFormat::CSV;
+                } else if (form == "table") {
+                    format = OutPutFormat::TABLE;
+                } else if (form == "html") {
+                    format = OutPutFormat::HTML;
+                } else {
+                    std::cerr << "Invalid format" << std::endl;
+                    return 1;
+                }
+                std::cout << "Format: " << form << std::endl;
+                continue;
+            }
+
             std::cerr << "Unknown argument: " << argv[i] << std::endl;
             return 1;
         }
@@ -391,7 +484,7 @@ int main(int argc, char *argv[]) {
 
     std::cout << "\n\nРепозиторий: " << repo_path << std::endl;
     
-    error = analis(repo_path, since, until, author, no_merges, top);
+    error = analis(repo_path, since, until, author, no_merges, top, format);
     if (error != 0) {
         return error;
     }
