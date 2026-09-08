@@ -77,14 +77,13 @@ jobs:
             ls -la "$BINARY_PATH" || true
             exit 1
           fi
-          mkdir -p ${{ github.workspace }}/dist
-          cp "$BINARY_PATH/${{ matrix.artifact_name }}" ${{ github.workspace }}/dist/
-          cd ${{ github.workspace }}
-          tar -czf ${{ matrix.asset_name }}.tar.gz -C dist .
+          mkdir -p "${{ github.workspace }}/dist"
+          cp "$BINARY_PATH/${{ matrix.artifact_name }}" "${{ github.workspace }}/dist/"
+          tar -czf "${{ github.workspace }}/${{ matrix.asset_name }}.tar.gz" -C "${{ github.workspace }}/dist" .
 
       - name: Upload archive to release
         uses: softprops/action-gh-release@v2
         with:
-          files: ${{ matrix.asset_name }}.tar.gz
+          files: ${{ github.workspace }}/${{ matrix.asset_name }}.tar.gz
           tag_name: ${{ github.ref_name }}
           fail_on_unmatched_files: true
