@@ -78,7 +78,7 @@ jobs:
           fi
           mkdir -p dist
           cp "build/${{ matrix.artifact_name }}" dist/
-          tar --force-local -czf "${{ matrix.asset_name }}.tar.gz" -C dist .
+          tar -czf "${{ matrix.asset_name }}.tar.gz" -C dist .
 
       - name: Upload archive to release
         uses: softprops/action-gh-release@v2
