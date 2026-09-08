@@ -71,9 +71,6 @@ jobs:
         shell: bash
         run: |
           BINARY_PATH="${{ github.workspace }}/build"
-          if [ "${{ runner.os }}" == "Windows" ]; then
-            BINARY_PATH="$BINARY_PATH/Release"
-          fi
           if [ ! -f "$BINARY_PATH/${{ matrix.artifact_name }}" ]; then
             echo "Ошибка: Файл ${{ matrix.artifact_name }} не найден в $BINARY_PATH"
             echo "Содержимое директории:"
