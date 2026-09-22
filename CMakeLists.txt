@@ -92,7 +92,15 @@ endif()
 
 message(STATUS "✓ libgit2 found: ${LIBGIT2_LIBRARIES}")
 
-add_executable(GitHeatMap main.cpp)
+add_executable(${PROJECT_NAME}
+    src/main.cpp
+    src/analyzer/repo_analyzer.cpp
+    src/analyzer/output_printer.cpp
+)
+
+target_include_directories(${PROJECT_NAME} PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
 
 target_include_directories(GitHeatMap PRIVATE ${LIBGIT2_INCLUDE_DIRS})
 target_link_libraries(GitHeatMap PRIVATE ${LIBGIT2_LIBRARIES})
