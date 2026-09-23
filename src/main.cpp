@@ -1,5 +1,5 @@
 #include "analyzer/repo_analyzer.hpp"
-#include "./../include/CLI11.hpp"
+#include "CLI11.hpp"
 #include "analyzer/output_printer.hpp"
 
 #include <chrono>

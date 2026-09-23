@@ -57,9 +57,19 @@ std::vector<FileStat> RepoAnalyzer::analyze() {
             return {};
         }
     } else {
-        std::string ref_name = "refs/heads/" + options_.branch;
-        if (git_revwalk_push_ref(walker.get(), ref_name.c_str()) != 0) {
-            std::cerr << "Failed to push branch '" << options_.branch << "'\n";
+        git_object* raw_target = nullptr;
+        if (git_revparse_single(&raw_target, repo.get(), options_.branch.c_str()) != 0) {
+            const git_error* err = git_error_last();
+            std::cerr << "Cannot resolve revision or branch '" << options_.branch 
+                    << "': " << (err ? err->message : "unknown error") << "\n";
+            return {};
+        }
+
+        git::Object target_obj(raw_target);
+
+        const git_oid* target_oid = git_object_id(target_obj.get());
+        if (git_revwalk_push(walker.get(), target_oid) != 0) {
+            std::cerr << "Failed to push target commit to revwalk\n";
             return {};
         }
     }
@@ -146,9 +156,24 @@ std::vector<FileStat> RepoAnalyzer::analyze() {
         results.push_back(std::move(stat));
     }
 
-    std::sort(results.begin(), results.end(), [](const FileStat& a, const FileStat& b) {
-        return a.commit_count > b.commit_count;
-    });
+    switch (options_.sort_by) {
+        case SortBy::COMMIT_COUNT:
+            std::sort(results.begin(), results.end(), [](const FileStat& a, const FileStat& b) {
+                return a.commit_count > b.commit_count;
+            });
+            break;
+        case SortBy::LAST_CHANGE:
+            std::sort(results.begin(), results.end(), [](const FileStat& a, const FileStat& b) {
+                return a.last_commit_time > b.last_commit_time;
+            });
+            break;
+        case SortBy::FILE_NAME:
+            std::sort(results.begin(), results.end(), [](const FileStat& a, const FileStat& b) {
+                return a.path < b.path;
+            });
+            break;
+    }
+    
 
     return results;
 }

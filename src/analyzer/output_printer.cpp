@@ -2,6 +2,7 @@
 
 #include <iostream>
 #include <iomanip>
+#include <fstream>
 
 OutputPrinter::OutputPrinter(OutputOptions options)
     : options_(std::move(options)) {}
@@ -37,38 +38,69 @@ std::string OutputPrinter::format_timestamp(int64_t timestamp) {
 }
 
 void OutputPrinter::output_table() {
-    std::cout << "\n"
+    std::ofstream file_out;
+    if (!options_.output_file.empty()) {
+        file_out.open(options_.output_file);
+    }
+
+    std::ostream& out = options_.output_file.empty() ? std::cout : file_out;
+
+    out << "\n"
               << std::left
               << std::setw(8)  << "COUNT"
               << std::setw(20) << "LAST CHANGE"
               << std::setw(12) << "HASH"
               << "FILE\n";
-    std::cout << std::string(70, '-') << "\n";
+    out << std::string(70, '-') << "\n";
 
     size_t limit = std::min<size_t>(options_.stats.size(), options_.top);
     for (size_t i = 0; i < limit; ++i) {
         const auto& item = options_.stats[i];
-        std::cout << std::left
+        out << std::left
                   << std::setw(8)  << item.commit_count
                   << std::setw(20) << format_timestamp(item.last_commit_time)
                   << std::setw(12) << item.last_hash
                   << item.path << "\n";
     }
 
-    std::cout << "\nTotal files analyzed: " << options_.stats.size() << "\n";
+    out << "\nTotal files analyzed: " << options_.stats.size() << "\n";
 }
 
 void OutputPrinter::output_json() {
+    std::ofstream file_out;
+    if (!options_.output_file.empty()) {
+        file_out.open(options_.output_file);
+    }
+
+    std::ostream& out = options_.output_file.empty() ? std::cout : file_out;
     // TODO
-    std::cout << "TODO\n";
+    out << "TODO\n";
 }
 
 void OutputPrinter::output_csv() {
-    // TODO
-    std::cout << "TODO\n";
+    std::ofstream file_out;
+    if (!options_.output_file.empty()) {
+        file_out.open(options_.output_file);
+    }
+
+    std::ostream& out = options_.output_file.empty() ? std::cout : file_out;
+    out << "COUNT,FILE,LAST_CHANGE,HASH\n";
+    size_t limit = std::min<size_t>(options_.stats.size(), options_.top);
+    for (size_t i = 0; i < limit; ++i) {
+        out << options_.stats[i].commit_count << ","
+            << options_.stats[i].path << ","
+            << format_timestamp(options_.stats[i].last_commit_time) << ","
+            << options_.stats[i].last_hash << "\n";
+    }
 }
 
 void OutputPrinter::output_html() {
+    std::ofstream file_out;
+    if (!options_.output_file.empty()) {
+        file_out.open(options_.output_file);
+    }
+
+    std::ostream& out = options_.output_file.empty() ? std::cout : file_out;
     // TODO
-    std::cout << "TODO\n";
+    out << "TODO\n";
 }

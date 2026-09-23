@@ -19,6 +19,7 @@ using Commit     = Handle<git_commit, git_commit_free>;
 using Tree       = Handle<git_tree, git_tree_free>;
 using Diff       = Handle<git_diff, git_diff_free>;
 using Revwalk    = Handle<git_revwalk, git_revwalk_free>;
+using Object     = Handle<git_object, git_object_free>;
 
 struct GlobalContext {
     GlobalContext() { git_libgit2_init(); }
