@@ -1,5 +1,7 @@
 #pragma once
 #include "analyzer/types.hpp"
+#include "libs/json.hpp"
+using json = nlohmann::json;
 
 class OutputPrinter {
 public:
@@ -19,4 +21,6 @@ private:
     void output_csv();
 
     void output_html();
+
+    void to_json(json& j, const FileStat& stat);
 };

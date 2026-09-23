@@ -4,6 +4,16 @@
 #include <iomanip>
 #include <fstream>
 
+void OutputPrinter::to_json(json& j, const FileStat& stat) {
+    j = json {
+        {"path", stat.path},
+        {"commit_count", stat.commit_count},
+        {"last_commit_time", format_timestamp(stat.last_commit_time)},
+        {"last_author", stat.last_author},
+        {"last_hash", stat.last_hash}
+    };
+}
+
 OutputPrinter::OutputPrinter(OutputOptions options)
     : options_(std::move(options)) {}
 
@@ -73,8 +83,15 @@ void OutputPrinter::output_json() {
     }
 
     std::ostream& out = options_.output_file.empty() ? std::cout : file_out;
-    // TODO
-    out << "TODO\n";
+    json result;
+    size_t limit = std::min<size_t>(options_.stats.size(), options_.top);
+    json j;
+    for (size_t i = 0; i < limit; ++i) {
+        to_json(j, options_.stats[i]);
+        result.push_back(j);
+    }
+
+    out << result.dump(4) << "\n";
 }
 
 void OutputPrinter::output_csv() {
