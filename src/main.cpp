@@ -68,6 +68,7 @@ int main(int argc, char* argv[]) {
         ->transform(CLI::CheckedTransformer(print_map, CLI::ignore_case))
         ->default_val(PrintType::TABLE);
     app.add_option("--output", out_opts.output_file, "The output file")->default_val("");
+    app.add_option("-a,--author", opts.author_pattern, "Filter commits by author name or pattern (e.g. 'John', '*bot*')")->default_val("");
 
     CLI11_PARSE(app, argc, argv);
 

@@ -2,6 +2,8 @@
 #include <string>
 #include <string_view>
 #include <vector>
+#include <algorithm>
+#include <cctype>
 
 namespace filter {
 
@@ -59,6 +61,29 @@ inline bool is_excluded(std::string_view path, const std::vector<std::string>& p
     }
 
     return false;
+}
+
+inline std::string to_lower(std::string_view sv) {
+    std::string s(sv);
+    std::transform(s.begin(), s.end(), s.begin(), [](unsigned char c) {
+        return static_cast<char>(std::tolower(c));
+    });
+    return s;
+}
+
+inline bool matches_author(std::string_view author, std::string_view pattern) {
+    if (pattern.empty()) {
+        return true;
+    }
+
+    std::string lower_author = to_lower(author);
+    std::string lower_pattern = to_lower(pattern);
+
+    if (lower_pattern.find_first_of("*?") != std::string_view::npos) {
+        return wildcard_match(lower_author, lower_pattern);
+    }
+
+    return lower_author.find(lower_pattern) != std::string::npos;
 }
 
 }

@@ -17,6 +17,7 @@ struct FilterOptions {
     int64_t since_timestamp = 0;
     int64_t until_timestamp = 0;
     std::vector<std::string> exclude_patterns;
+    std::string author_pattern = "";
     SortBy sort_by = SortBy::COMMIT_COUNT;
 };
 

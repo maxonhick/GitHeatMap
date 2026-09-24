@@ -1,6 +1,6 @@
 #include "analyzer/repo_analyzer.hpp"
 #include "git/git_handle.hpp"
-#include "analyzer/path_filter.hpp"
+#include "analyzer/filters.hpp"
 
 #include <algorithm>
 #include <iostream>
@@ -95,6 +95,10 @@ std::vector<FileStat> RepoAnalyzer::analyze() {
         std::string author_name = author && author->name ? author->name : "Unknown";
         int64_t commit_time = static_cast<int64_t>(git_commit_time(commit.get()));
         std::string short_hash = get_short_oid(&oid);
+
+        if (!filter::matches_author(author_name, options_.author_pattern)) {
+            continue;
+        }
 
         if (options_.since_timestamp > 0 && commit_time < options_.since_timestamp) {
             continue;
