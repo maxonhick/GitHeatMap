@@ -128,3 +128,39 @@ endif()
 
 message(STATUS "Platform: ${CMAKE_SYSTEM_NAME}")
 message(STATUS "Compiler: ${CMAKE_CXX_COMPILER_ID}")
+
+option(BUILD_TESTS "Build tests" ON)
+
+if(BUILD_TESTS)
+    enable_testing()
+
+    include(FetchContent)
+    FetchContent_Declare(
+        googletest
+        URL https://github.com/google/googletest/archive/refs/tags/v1.14.0.zip
+        DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+    )
+    set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
+    FetchContent_MakeAvailable(googletest)
+
+    add_executable(githeatmap_tests
+        tests/test_filters.cpp
+        tests/test_output_printer.cpp
+        tests/test_repo_analyzer.cpp
+        src/analyzer/repo_analyzer.cpp
+        src/analyzer/output_printer.cpp
+    )
+
+    target_include_directories(githeatmap_tests PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${LIBGIT2_INCLUDE_DIRS}
+    )
+
+    target_link_libraries(githeatmap_tests PRIVATE
+        GTest::gtest_main
+        ${LIBGIT2_LIBRARIES}
+    )
+
+    include(GoogleTest)
+    gtest_discover_tests(githeatmap_tests)
+endif()
