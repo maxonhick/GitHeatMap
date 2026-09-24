@@ -56,7 +56,7 @@ int main(int argc, char* argv[]) {
         ->default_val(SortBy::COMMIT_COUNT);
 
     app.add_option("-n,--top", out_opts.top, "The number of results to return")
-        ->default_val(10);
+        ->default_val(0);
 
     const std::map<std::string, PrintType> print_map = {
         {"csv", PrintType::CSV},

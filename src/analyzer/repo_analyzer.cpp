@@ -1,8 +1,10 @@
 #include "analyzer/repo_analyzer.hpp"
 #include "git/git_handle.hpp"
+#include "analyzer/path_filter.hpp"
 
 #include <algorithm>
 #include <iostream>
+#include <vector>
 #include <unordered_map>
 #include <string_view>
 
@@ -134,6 +136,10 @@ std::vector<FileStat> RepoAnalyzer::analyze() {
             }
 
             std::string file_path = delta->new_file.path;
+
+            if (filter::is_excluded(file_path, options_.exclude_patterns)) {
+                continue;
+            }
 
             if (!matches_extension(file_path, options_.extensions)) {
                 continue;

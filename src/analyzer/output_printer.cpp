@@ -18,6 +18,12 @@ OutputPrinter::OutputPrinter(OutputOptions options)
     : options_(std::move(options)) {}
 
 void OutputPrinter::output() {
+    if (options_.top == 0 && options_.print_type != PrintType::TABLE) {
+        options_.top = options_.stats.size();
+    } else if (options_.top == 0 && options_.print_type == PrintType::TABLE) {
+        options_.top = 10;
+    }
+
     switch (options_.print_type) {
         case PrintType::TABLE:
             output_table();
