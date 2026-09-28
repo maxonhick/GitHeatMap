@@ -3,6 +3,27 @@
 #include <iostream>
 #include <iomanip>
 #include <fstream>
+#include <cmath>
+
+namespace {
+
+std::string escape_html(std::string_view data) {
+    std::string buffer;
+    buffer.reserve(data.size());
+    for (char c : data) {
+        switch (c) {
+            case '&':  buffer.append("&amp;");  break;
+            case '\"': buffer.append("&quot;"); break;
+            case '\'': buffer.append("&apos;"); break;
+            case '<':  buffer.append("&lt;");   break;
+            case '>':  buffer.append("&gt;");   break;
+            default:   buffer.push_back(c);     break;
+        }
+    }
+    return buffer;
+}
+
+}
 
 void OutputPrinter::to_json(json& j, const FileStat& stat) {
     j = json {
@@ -124,6 +145,94 @@ void OutputPrinter::output_html() {
     }
 
     std::ostream& out = options_.output_file.empty() ? std::cout : file_out;
-    // TODO
-    out << "TODO\n";
+    size_t limit = std::min<size_t>(options_.stats.size(), options_.top);
+    uint64_t max_commits = 1;
+    for (size_t i = 0; i < limit; ++i) {
+        if (options_.stats[i].commit_count > max_commits) {
+            max_commits = options_.stats[i].commit_count;
+        }
+    }
+
+    out << "<!DOCTYPE html>\n"
+        << "<html lang=\"en\">\n"
+        << "<head>\n"
+        << "  <meta charset=\"UTF-8\">\n"
+        << "  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n"
+        << "  <title>GitHeatMap Report</title>\n"
+        << "  <style>\n"
+        << "    :root {\n"
+        << "      --bg: #0d1117; --card-bg: #161b22; --border: #30363d;\n"
+        << "      --text: #c9d1d9; --text-muted: #8b949e; --accent: #58a6ff;\n"
+        << "      --bar-start: #238636; --bar-end: #da3633;\n"
+        << "    }\n"
+        << "    body {\n"
+        << "      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;\n"
+        << "      background-color: var(--bg); color: var(--text);\n"
+        << "      margin: 0; padding: 2rem;\n"
+        << "    }\n"
+        << "    .container { max-width: 1200px; margin: 0 auto; }\n"
+        << "    h1 { margin-bottom: 0.5rem; font-size: 1.8rem; }\n"
+        << "    .meta { color: var(--text-muted); margin-bottom: 1.5rem; font-size: 0.95rem; }\n"
+        << "    table {\n"
+        << "      width: 100%; border-collapse: collapse;\n"
+        << "      background-color: var(--card-bg); border-radius: 6px;\n"
+        << "      overflow: hidden; border: 1px solid var(--border);\n"
+        << "    }\n"
+        << "    th, td { padding: 10px 14px; text-align: left; border-bottom: 1px solid var(--border); }\n"
+        << "    th { background-color: #21262d; font-size: 0.85rem; color: var(--text-muted); text-transform: uppercase; }\n"
+        << "    tr:last-child td { border-bottom: none; }\n"
+        << "    tr:hover td { background-color: rgba(110, 118, 129, 0.08); }\n"
+        << "    .path { font-family: monospace; font-size: 0.9rem; word-break: break-all; }\n"
+        << "    .hash { font-family: monospace; font-size: 0.85rem; color: var(--accent); }\n"
+        << "    .bar-cell { min-width: 180px; width: 25%; }\n"
+        << "    .bar-track {\n"
+        << "      background-color: #21262d; border-radius: 4px;\n"
+        << "      height: 14px; width: 100%; overflow: hidden; display: flex;\n"
+        << "    }\n"
+        << "    .bar-fill {\n"
+        << "      height: 100%; border-radius: 4px;\n"
+        << "      background: linear-gradient(90deg, var(--bar-start), var(--bar-end));\n"
+        << "    }\n"
+        << "  </style>\n"
+        << "</head>\n"
+        << "<body>\n"
+        << "  <div class=\"container\">\n"
+        << "    <h1>GitHeatMap Activity Report</h1>\n"
+        << "    <div class=\"meta\">Analyzed " << options_.stats.size() << " files (showing top " << limit << ")</div>\n"
+        << "    <table>\n"
+        << "      <thead>\n"
+        << "        <tr>\n"
+        << "          <th style=\"width: 80px;\">Commits</th>\n"
+        << "          <th class=\"bar-cell\">Activity</th>\n"
+        << "          <th>File Path</th>\n"
+        << "          <th>Last Change</th>\n"
+        << "          <th>Author</th>\n"
+        << "          <th>Commit</th>\n"
+        << "        </tr>\n"
+        << "      </thead>\n"
+        << "      <tbody>\n";
+
+    for (size_t i = 0; i < limit; ++i) {
+        const auto& item = options_.stats[i];
+        double pct = (static_cast<double>(item.commit_count) / max_commits) * 100.0;
+
+        out << "        <tr>\n"
+            << "          <td><strong>" << item.commit_count << "</strong></td>\n"
+            << "          <td class=\"bar-cell\">\n"
+            << "            <div class=\"bar-track\">\n"
+            << "              <div class=\"bar-fill\" style=\"width: " << std::fixed << std::setprecision(1) << pct << "%;\"></div>\n"
+            << "            </div>\n"
+            << "          </td>\n"
+            << "          <td class=\"path\">" << escape_html(item.path) << "</td>\n"
+            << "          <td>" << format_timestamp(item.last_commit_time) << "</td>\n"
+            << "          <td>" << escape_html(item.last_author) << "</td>\n"
+            << "          <td class=\"hash\">" << escape_html(item.last_hash) << "</td>\n"
+            << "        </tr>\n";
+    }
+
+    out << "      </tbody>\n"
+        << "    </table>\n"
+        << "  </div>\n"
+        << "</body>\n"
+        << "</html>\n";
 }

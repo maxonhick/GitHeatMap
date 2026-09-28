@@ -83,3 +83,24 @@ TEST_F(OutputPrinterTest, OutputTableFormat) {
     EXPECT_NE(out.find("Total files analyzed: 3"), std::string::npos);
     EXPECT_NE(out.find("src/main.cpp"), std::string::npos);
 }
+
+TEST_F(OutputPrinterTest, OutputHtmlFormat) {
+    OutputOptions opts;
+    opts.print_type = PrintType::HTML;
+    opts.stats = sample_stats;
+    opts.top = 2;
+
+    std::stringstream buffer;
+    std::streambuf* old_cout = std::cout.rdbuf(buffer.rdbuf());
+
+    OutputPrinter printer(opts);
+    printer.output();
+
+    std::cout.rdbuf(old_cout);
+
+    std::string out = buffer.str();
+    EXPECT_NE(out.find("<!DOCTYPE html>"), std::string::npos);
+    EXPECT_NE(out.find("GitHeatMap Activity Report"), std::string::npos);
+    EXPECT_NE(out.find("src/main.cpp"), std::string::npos);
+    EXPECT_NE(out.find("class=\"bar-fill\""), std::string::npos);
+}
