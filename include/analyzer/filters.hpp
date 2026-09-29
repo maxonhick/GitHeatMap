@@ -10,6 +10,7 @@
 #include <sstream>
 #include <regex>
 #include <optional>
+#include <unordered_map>
 #include <stdexcept>
 
 namespace filter {
