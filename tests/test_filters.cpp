@@ -59,3 +59,23 @@ TEST(FiltersTest, MatchesAuthor) {
     EXPECT_TRUE(filter::matches_author("Developer", "Dev*"));
     EXPECT_FALSE(filter::matches_author("Developer", "*bot"));
 }
+
+TEST(DateParserTest, ParsesAbsoluteDate) {
+    EXPECT_EQ(filter::parse_date_to_timestamp("2026-01-01"), 1767225600);
+}
+
+TEST(DateParserTest, ParsesRelativeUnits) {
+    int64_t now = std::time(nullptr);
+
+    EXPECT_NEAR(filter::parse_date_to_timestamp("now"), now, 2);
+    EXPECT_NEAR(filter::parse_date_to_timestamp("2.weeks"), now - (14 * 86400), 2);
+    EXPECT_NEAR(filter::parse_date_to_timestamp("1.day"), now - 86400, 2);
+    EXPECT_NEAR(filter::parse_date_to_timestamp("3 hours ago"), now - (3 * 3600), 2);
+    EXPECT_NEAR(filter::parse_date_to_timestamp("a year ago"), now - (365 * 86400), 2);
+    EXPECT_NEAR(filter::parse_date_to_timestamp("last month"), now - (30 * 86400), 2);
+}
+
+TEST(DateParserTest, ThrowsOnInvalidInput) {
+    EXPECT_THROW(filter::parse_date_to_timestamp("not-a-date"), std::runtime_error);
+    EXPECT_THROW(filter::parse_date_to_timestamp("2026/05/10"), std::runtime_error);
+}

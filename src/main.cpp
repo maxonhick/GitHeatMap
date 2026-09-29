@@ -1,30 +1,10 @@
 #include "analyzer/repo_analyzer.hpp"
 #include "analyzer/output_printer.hpp"
+#include "analyzer/filters.hpp"
 #include "libs/CLI11.hpp"
 
-#include <chrono>
 #include <iostream>
 
-namespace {
-
-int64_t parse_date_to_timestamp(const std::string& date_str) {
-    if (date_str.empty()) {
-        return 0;
-    }
-    std::tm tm{};
-    std::istringstream ss(date_str);
-    ss >> std::get_time(&tm, "%Y-%m-%d");
-    if (ss.fail()) {
-        throw CLI::ValidationError("Date", "Invalid date format. Expected YYYY-MM-DD");
-    }
-#if defined(_WIN32)
-    return static_cast<int64_t>(_mkgmtime(&tm));
-#else
-    return static_cast<int64_t>(timegm(&tm));
-#endif
-}
-
-}
 
 int main(int argc, char* argv[]) {
     CLI::App app{"GitHeatMap Repo Analyzer"};
@@ -73,8 +53,8 @@ int main(int argc, char* argv[]) {
     CLI11_PARSE(app, argc, argv);
 
     try {
-        opts.since_timestamp = parse_date_to_timestamp(since_str);
-        opts.until_timestamp = parse_date_to_timestamp(until_str);
+        opts.since_timestamp = filter::parse_date_to_timestamp(since_str);
+        opts.until_timestamp = filter::parse_date_to_timestamp(until_str);
     } catch (const CLI::ValidationError& e) {
         std::cerr << "Argument error: " << e.what() << "\n";
         return 1;
