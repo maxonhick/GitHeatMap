@@ -20,57 +20,31 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install dependencies (Linux)
+      - name: Install Ninja (Linux)
         if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libgit2-dev pkg-config ninja-build
+        run: sudo apt-get update && sudo apt-get install -y ninja-build
 
-      - name: Install dependencies (macOS)
+      - name: Install Ninja (macOS)
         if: runner.os == 'macOS'
-        run: |
-          brew update
-          brew install libgit2 pkg-config ninja
+        run: brew install ninja
 
-      - name: Install dependencies (Windows)
+      - name: Install Ninja (Windows)
         if: runner.os == 'Windows'
-        run: |
-          choco install ninja
-          vcpkg install libgit2:x64-windows
-        shell: pwsh
+        run: choco install ninja
 
-      - name: Configure CMake (Linux/macOS)
-        if: runner.os != 'Windows'
-        run: |
-          cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_STANDARD=17
-        shell: bash
-
-      - name: Configure CMake (Windows)
-        if: runner.os == 'Windows'
-        run: |
-          cmake -B build -G Ninja `
-            -DCMAKE_BUILD_TYPE=Release `
-            -DCMAKE_CXX_STANDARD=17 `
-            -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake"
-        shell: pwsh
+      - name: Configure CMake
+        run: >
+          cmake -B build -G Ninja
+          -DCMAKE_BUILD_TYPE=Release
+          -DCMAKE_CXX_STANDARD=17
+          -DBUILD_TESTS=ON
 
       - name: Build
         run: cmake --build build --config Release
 
-      - name: Run Tests (Linux/macOS)
-        if: runner.os != 'Windows'
+      - name: Run Tests
         working-directory: build
         run: ctest --output-on-failure
-
-      - name: Run Tests (Windows)
-        if: runner.os == 'Windows'
-        working-directory: build
-        run: |
-          $vcpkgBin = "$pwd\vcpkg_installed\x64-windows\bin"
-          if (Test-Path $vcpkgBin) {$env:PATH = "$vcpkgBin;" + $env:PATH
-          }
-          ctest --output-on-failure
-        shell: pwsh
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
