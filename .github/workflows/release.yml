@@ -5,13 +5,14 @@ on:
       - 'v*'
 permissions:
   contents: write
+
 jobs:
   build:
-    name: Build and archive for ${{ matrix.os }}
+    name: Build static binary for ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
         include:
           - os: ubuntu-latest
             artifact_name: GitHeatMap
@@ -22,60 +23,36 @@ jobs:
           - os: macos-latest
             artifact_name: GitHeatMap
             asset_name: git-heatmap-macos-universal
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install dependencies (Linux)
+      - name: Install Ninja (Linux)
         if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libgit2-dev pkg-config ninja-build
+        run: sudo apt-get update && sudo apt-get install -y ninja-build
 
-      - name: Install dependencies (macOS)
+      - name: Install Ninja (macOS)
         if: runner.os == 'macOS'
-        run: |
-          brew update
-          brew install libgit2 pkg-config ninja
+        run: brew install ninja
 
-      - name: Install dependencies (Windows)
+      - name: Install Ninja (Windows)
         if: runner.os == 'Windows'
-        run: |
-          choco install ninja
-          git clone https://github.com/Microsoft/vcpkg.git
-          cd vcpkg
-          .\bootstrap-vcpkg.bat
-          .\vcpkg install libgit2:x64-windows
-          echo "VCPKG_ROOT=$env:GITHUB_WORKSPACE/vcpkg" >> $env:GITHUB_ENV
-        shell: pwsh
+        run: choco install ninja
 
-      - name: Configure CMake (Linux/macOS)
-        if: runner.os != 'Windows'
-        run: |
-          cmake -B build -G Ninja -DCMAKE_CXX_STANDARD=17
-        shell: bash
-
-      - name: Configure CMake (Windows)
-        if: runner.os == 'Windows'
-        run: |
-          cmake -B build -G Ninja `
-            -DCMAKE_CXX_STANDARD=17 `
-            -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake"
-        shell: pwsh
+      - name: Configure CMake
+        run: >
+          cmake -B build -G Ninja
+          -DCMAKE_BUILD_TYPE=Release
+          -DBUILD_TESTS=OFF
+          ${{ runner.os == 'macOS' && '-DCMAKE_OSX_ARCHITECTURES="arm64;x86_64"' || '' }}
 
       - name: Build
         run: cmake --build build --config Release
 
-      # Creating an archive with a binary file
       - name: Create archive
         shell: bash
         run: |
-          if [ ! -f "build/${{ matrix.artifact_name }}" ]; then
-            echo "Ошибка: Файл ${{ matrix.artifact_name }} не найден в build"
-            echo "Содержимое директории build:"
-            ls -la "build" || true
-            exit 1
-          fi
           mkdir -p dist
           cp "build/${{ matrix.artifact_name }}" dist/
           tar -czf "${{ matrix.asset_name }}.tar.gz" -C dist .

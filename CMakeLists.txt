@@ -1,122 +1,135 @@
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.14)
 project(GitHeatMap)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-find_package(PkgConfig QUIET)
-if(PKG_CONFIG_FOUND)
-    pkg_check_modules(LIBGIT2 libgit2)
-endif()
+# -------------------------------------------------------------
+# Сборка статической libgit2 через FetchContent
+# -------------------------------------------------------------
+include(FetchContent)
 
-if(LIBGIT2_FOUND AND LIBGIT2_LIBRARIES)
-    if(NOT LIBGIT2_LIBRARIES MATCHES "/")
-        message(STATUS "pkg-config returned short name: ${LIBGIT2_LIBRARIES}")
-        find_library(LIBGIT2_LIBRARY_FULL
-            NAMES ${LIBGIT2_LIBRARIES} git2 libgit2
-            PATHS
-                ${LIBGIT2_LIBRARY_DIRS}
-                /opt/homebrew/lib
-                /usr/local/lib
-                /usr/lib
-                /usr/lib/x86_64-linux-gnu
-                /usr/lib/aarch64-linux-gnu
-            NO_DEFAULT_PATH
-        )
-        if(LIBGIT2_LIBRARY_FULL)
-            set(LIBGIT2_LIBRARIES ${LIBGIT2_LIBRARY_FULL})
-            message(STATUS "Found full path: ${LIBGIT2_LIBRARIES}")
-        endif()
-    endif()
-endif()
+# Отключаем ненужные для анализатора модули libgit2 ради ускорения сборки
+set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+set(BUILD_TESTS OFF CACHE BOOL "" FORCE)
+set(BUILD_CLI OFF CACHE BOOL "" FORCE)
+set(USE_SSH OFF CACHE BOOL "" FORCE)
+set(USE_HTTPS OFF CACHE BOOL "" FORCE)       # Для локального анализатора сеть не нужна
+set(REGEX_BACKEND "builtin" CACHE STRING "" FORCE)
 
-if(NOT LIBGIT2_FOUND OR NOT LIBGIT2_LIBRARIES MATCHES "/")
-    # Ищем библиотеку вручную
-    find_library(LIBGIT2_LIBRARY
-        NAMES git2 libgit2
-        PATHS
-            # macOS
-            /opt/homebrew/lib
-            /usr/local/lib
-            # Linux
-            /usr/lib
-            /usr/lib/x86_64-linux-gnu
-            /usr/lib/aarch64-linux-gnu
-            # Windows (vcpkg)
-            ${VCPKG_ROOT}/installed/x64-windows/lib
-            ${VCPKG_ROOT}/installed/x86-windows/lib
-            C:/vcpkg/installed/x64-windows/lib
-            C:/vcpkg/installed/x86-windows/lib
-            # Windows (MSYS2)
-            C:/msys64/mingw64/lib
-            C:/msys64/mingw32/lib
-            ${CMAKE_SYSTEM_LIBRARY_PATH}
-    )
-    
-    find_path(LIBGIT2_INCLUDE_DIR
-        NAMES git2.h
-        PATHS
-            # macOS
-            /opt/homebrew/include
-            /usr/local/include
-            # Linux
-            /usr/include
-            /usr/local/include
-            # Windows (vcpkg)
-            ${VCPKG_ROOT}/installed/x64-windows/include
-            ${VCPKG_ROOT}/installed/x86-windows/include
-            C:/vcpkg/installed/x64-windows/include
-            C:/vcpkg/installed/x86-windows/include
-            # Windows (MSYS2)
-            C:/msys64/mingw64/include
-            C:/msys64/mingw32/include
-            ${CMAKE_SYSTEM_INCLUDE_PATH}
-    )
-    
-    if(LIBGIT2_LIBRARY AND LIBGIT2_INCLUDE_DIR)
-        set(LIBGIT2_FOUND TRUE)
-        set(LIBGIT2_INCLUDE_DIRS ${LIBGIT2_INCLUDE_DIR})
-        set(LIBGIT2_LIBRARIES ${LIBGIT2_LIBRARY})
-    endif()
-endif()
+FetchContent_Declare(
+    libgit2
+    URL https://github.com/libgit2/libgit2/archive/refs/tags/v1.8.1.zip
+    DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+)
+FetchContent_MakeAvailable(libgit2)
 
-if(NOT LIBGIT2_FOUND)
-    message(FATAL_ERROR 
-        "libgit2 not found!\n"
-        "  Install it:\n"
-        "    Linux:  sudo apt install libgit2-dev\n"
-        "    macOS:  brew install libgit2\n"
-        "    Windows: vcpkg install libgit2:x64-windows\n"
-    )
-endif()
+# -------------------------------------------------------------
+# Основной исполняемый файл
+# -------------------------------------------------------------
+add_executable(${PROJECT_NAME}
+    src/main.cpp
+    src/analyzer/repo_analyzer.cpp
+    src/analyzer/output_printer.cpp
+)
 
-message(STATUS "✓ libgit2 found: ${LIBGIT2_LIBRARIES}")
+target_include_directories(${PROJECT_NAME} PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${libgit2_SOURCE_DIR}/include
+)
 
-add_executable(GitHeatMap main.cpp)
+# Линкуем статический таргет libgit2package
+target_link_libraries(${PROJECT_NAME} PRIVATE libgit2package)
 
-target_include_directories(GitHeatMap PRIVATE ${LIBGIT2_INCLUDE_DIRS})
-target_link_libraries(GitHeatMap PRIVATE ${LIBGIT2_LIBRARIES})
-
+# Системные зависимости для статической линковки
 if(APPLE)
-    target_link_libraries(GitHeatMap PRIVATE
+    target_link_libraries(${PROJECT_NAME} PRIVATE
         "-framework CoreFoundation"
         "-framework Security"
+        iconv
     )
 endif()
 
 if(UNIX AND NOT APPLE)
     find_package(Threads REQUIRED)
-    target_link_libraries(GitHeatMap PRIVATE Threads::Threads)
+    target_link_libraries(${PROJECT_NAME} PRIVATE 
+        Threads::Threads
+        # Вшиваем runtime C++ и C для максимальной переносимости между дистрибутивами Linux
+        -static-libgcc
+        -static-libstdc++
+    )
 endif()
 
 if(WIN32)
-    target_link_libraries(GitHeatMap PRIVATE
+    target_link_libraries(${PROJECT_NAME} PRIVATE
         winhttp
         crypt32
         rpcrt4
         ole32
     )
+    # Статический рантайм MSVC (/MT вместо /MD)
+    set_property(TARGET ${PROJECT_NAME} PROPERTY
+        MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 endif()
 
-message(STATUS "Platform: ${CMAKE_SYSTEM_NAME}")
-message(STATUS "Compiler: ${CMAKE_CXX_COMPILER_ID}")
+# -------------------------------------------------------------
+# Тесты
+# -------------------------------------------------------------
+option(BUILD_TESTS "Build tests" ON)
+
+if(BUILD_TESTS)
+    enable_testing()
+
+    FetchContent_Declare(
+        googletest
+        URL https://github.com/google/googletest/archive/refs/tags/v1.14.0.zip
+        DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+    )
+    set(gtest_force_shared_crt OFF CACHE BOOL "" FORCE)
+    FetchContent_MakeAvailable(googletest)
+
+    add_executable(githeatmap_tests
+        tests/test_filters.cpp
+        tests/test_output_printer.cpp
+        tests/test_repo_analyzer.cpp
+        src/analyzer/repo_analyzer.cpp
+        src/analyzer/output_printer.cpp
+    )
+
+    target_include_directories(githeatmap_tests PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${libgit2_SOURCE_DIR}/include
+    )
+
+    target_link_libraries(githeatmap_tests PRIVATE
+        GTest::gtest_main
+        libgit2package
+    )
+
+    if(APPLE)
+        target_link_libraries(githeatmap_tests PRIVATE
+            "-framework CoreFoundation"
+            "-framework Security"
+            iconv
+        )
+    endif()
+
+    if(UNIX AND NOT APPLE)
+        find_package(Threads REQUIRED)
+        target_link_libraries(githeatmap_tests PRIVATE Threads::Threads)
+    endif()
+
+    if(WIN32)
+        target_link_libraries(githeatmap_tests PRIVATE
+            winhttp
+            crypt32
+            rpcrt4
+            ole32
+        )
+        set_property(TARGET githeatmap_tests PROPERTY
+            MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+    endif()
+
+    include(GoogleTest)
+    gtest_discover_tests(githeatmap_tests)
+endif()
