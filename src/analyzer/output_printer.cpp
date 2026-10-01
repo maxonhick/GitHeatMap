@@ -74,6 +74,138 @@ std::string OutputPrinter::format_timestamp(int64_t timestamp) {
     return std::string(buf);
 }
 
+void OutputPrinter::output_activity_table(std::ostream& out) {
+    const auto& act = options_.activity;
+
+    if (act.total_commits == 0) {
+        out << "No commits found for activity chart.\n";
+        return;
+    }
+
+    uint64_t max_val = 1;
+    for (const auto& [_, count] : act.buckets) {
+        if (count > max_val) max_val = count;
+    }
+
+    const int max_bar_width = 40;
+
+    out << "\nCommit Activity Histogram (" << act.total_commits << " commits total)\n";
+    out << std::string(60, '=') << "\n";
+
+    switch (act.type) {
+        case ActivityType::HOUR: {
+            for (int h = 0; h < 24; ++h) {
+                uint64_t count = act.buckets.count(h) ? act.buckets.at(h) : 0;
+                int bar_len = static_cast<int>((static_cast<double>(count) / max_val) * max_bar_width);
+
+                out << std::right << std::setw(2) << std::setfill('0') << h << ":00 " << std::setfill(' ')
+                    << "| " << std::string(bar_len, '#') << std::string(max_bar_width - bar_len, ' ')
+                    << " | " << count << "\n";
+            }
+            break;
+        }
+
+        case ActivityType::DAY: {
+            static const char* days[] = {"Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"};
+            for (int d = 0; d < 7; ++d) {
+                uint64_t count = act.buckets.count(d) ? act.buckets.at(d) : 0;
+                int bar_len = static_cast<int>((static_cast<double>(count) / max_val) * max_bar_width);
+
+                out << std::left << std::setw(5) << days[d] << "| "
+                    << std::string(bar_len, '#') << std::string(max_bar_width - bar_len, ' ')
+                    << " | " << count << "\n";
+            }
+            break;
+        }
+
+        case ActivityType::MONTH: {
+            for (int day = 1; day <= 31; ++day) {
+                uint64_t count = act.buckets.count(day) ? act.buckets.at(day) : 0;
+                int bar_len = static_cast<int>((static_cast<double>(count) / max_val) * max_bar_width);
+
+                out << "Day " << std::right << std::setw(2) << day << " | "
+                    << std::string(bar_len, '#') << std::string(max_bar_width - bar_len, ' ')
+                    << " | " << count << "\n";
+            }
+            break;
+        }
+
+        case ActivityType::YEAR: {
+            static const char* months[] = {
+                "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+            };
+            for (int m = 1; m <= 12; ++m) {
+                uint64_t count = act.buckets.count(m) ? act.buckets.at(m) : 0;
+                int bar_len = static_cast<int>((static_cast<double>(count) / max_val) * max_bar_width);
+
+                out << std::left << std::setw(5) << months[m - 1] << "| "
+                    << std::string(bar_len, '#') << std::string(max_bar_width - bar_len, ' ')
+                    << " | " << count << "\n";
+            }
+            break;
+        }
+
+        case ActivityType::NONE:
+            break;
+    }
+
+    out << std::string(60, '=') << "\n\n";
+}
+
+void OutputPrinter::output_activity_csv(std::ostream& out) {
+    const auto& act = options_.activity;
+
+    if (act.total_commits == 0) {
+        out << "No commits found for activity chart.\n";
+        return;
+    }
+
+    out << "PERIOD,COUNT\n";
+    switch (act.type) {
+        case ActivityType::HOUR: {
+            for (int h = 0; h < 24; ++h) {
+                uint64_t count = act.buckets.count(h) ? act.buckets.at(h) : 0;
+                out << h << "," << count << "\n";
+            }
+            break;
+        }
+
+        case ActivityType::DAY: {
+            static const char* days[] = {"Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"};
+            for (int d = 0; d < 7; ++d) {
+                uint64_t count = act.buckets.count(d) ? act.buckets.at(d) : 0;
+                out << days[d] << "," << count << "\n";
+            }
+            break;
+        }
+
+        case ActivityType::MONTH: {
+            for (int day = 1; day <= 31; ++day) {
+                uint64_t count = act.buckets.count(day) ? act.buckets.at(day) : 0;
+                out << day << "," << count << "\n";
+            }
+            break;
+        }
+
+        case ActivityType::YEAR: {
+            static const char* months[] = {
+                "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+            };
+            for (int m = 1; m <= 12; ++m) {
+                uint64_t count = act.buckets.count(m) ? act.buckets.at(m) : 0;
+                out << months[m - 1] << "," << count << "\n";
+            }
+            break;
+        }
+
+        case ActivityType::NONE:
+            break;
+    }
+
+}
+
 void OutputPrinter::output_table() {
     std::ofstream file_out;
     if (!options_.output_file.empty()) {
@@ -81,6 +213,10 @@ void OutputPrinter::output_table() {
     }
 
     std::ostream& out = options_.output_file.empty() ? std::cout : file_out;
+
+    if (options_.activity.type != ActivityType::NONE) {
+        output_activity_table(out);
+    }
 
     out << "\n"
               << std::left
@@ -125,6 +261,15 @@ void OutputPrinter::output_csv() {
     std::ofstream file_out;
     if (!options_.output_file.empty()) {
         file_out.open(options_.output_file);
+    }
+
+    if (options_.activity.type != ActivityType::NONE) {
+        std::ofstream file_activity_out;
+        if (!options_.output_file.empty()) {
+            file_activity_out.open(options_.output_file + ".activity.csv");
+        }
+        std::ostream& out = options_.output_file.empty() ? std::cout : file_activity_out;
+        output_activity_csv(out);
     }
 
     std::ostream& out = options_.output_file.empty() ? std::cout : file_out;

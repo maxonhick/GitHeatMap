@@ -22,5 +22,9 @@ private:
 
     void output_html();
 
+    void output_activity_table(std::ostream& out);
+
+    void output_activity_csv(std::ostream& out);
+
     void to_json(json& j, const FileStat& stat);
 };

@@ -104,3 +104,25 @@ TEST_F(OutputPrinterTest, OutputHtmlFormat) {
     EXPECT_NE(out.find("src/main.cpp"), std::string::npos);
     EXPECT_NE(out.find("class=\"bar-fill\""), std::string::npos);
 }
+
+TEST_F(OutputPrinterTest, OutputActivityHistogram) {
+    OutputOptions opts;
+    opts.activity.type = ActivityType::DAY;
+    opts.activity.total_commits = 10;
+    opts.activity.buckets[0] = 6; // Mon
+    opts.activity.buckets[1] = 4; // Tue
+
+    std::stringstream buffer;
+    std::streambuf* old_cout = std::cout.rdbuf(buffer.rdbuf());
+
+    OutputPrinter printer(opts);
+    printer.output();
+
+    std::cout.rdbuf(old_cout);
+
+    std::string out = buffer.str();
+    EXPECT_NE(out.find("Commit Activity Histogram (10 commits total)"), std::string::npos);
+    EXPECT_NE(out.find("Mon"), std::string::npos);
+    EXPECT_NE(out.find("Tue"), std::string::npos);
+    EXPECT_NE(out.find("####"), std::string::npos);
+}

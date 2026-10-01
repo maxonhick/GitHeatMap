@@ -29,12 +29,43 @@ std::string get_short_oid(const git_oid* oid) {
     return std::string(buf);
 }
 
+void record_activity(ActivityStats& act, int64_t commit_time) {
+    if (act.type == ActivityType::NONE) return;
+
+    std::time_t t = static_cast<std::time_t>(commit_time);
+    std::tm tm_buf{};
+#if defined(_WIN32)
+    gmtime_s(&tm_buf, &t);
+#else
+    gmtime_r(&t, &tm_buf);
+#endif
+
+    act.total_commits++;
+
+    switch (act.type) {
+        case ActivityType::HOUR:
+            act.buckets[tm_buf.tm_hour]++;
+            break;
+        case ActivityType::DAY:
+            act.buckets[tm_buf.tm_wday]++;
+            break;
+        case ActivityType::MONTH:
+            act.buckets[tm_buf.tm_mday]++;
+            break;
+        case ActivityType::YEAR:
+            act.buckets[tm_buf.tm_mon + 1]++;
+            break;
+        default:
+            break;
+    }
+}
+
 }
 
 RepoAnalyzer::RepoAnalyzer(FilterOptions options)
     : options_(std::move(options)) {}
 
-std::vector<FileStat> RepoAnalyzer::analyze() {
+AnalysisResult RepoAnalyzer::analyze() {
     git::GlobalContext git_ctx;
 
     git_repository* raw_repo = nullptr;
@@ -77,6 +108,8 @@ std::vector<FileStat> RepoAnalyzer::analyze() {
     }
 
     std::unordered_map<std::string, FileStat> stats_map;
+    ActivityStats activity_stats;
+    activity_stats.type = options_.activity_type;
     git_oid oid;
 
     while (git_revwalk_next(&oid, walker.get()) == 0) {
@@ -132,6 +165,8 @@ std::vector<FileStat> RepoAnalyzer::analyze() {
         }
         git::Diff diff(raw_diff);
 
+        bool commit_has_matching_files = false;
+
         size_t num_deltas = git_diff_num_deltas(diff.get());
         for (size_t i = 0; i < num_deltas; ++i) {
             const git_diff_delta* delta = git_diff_get_delta(diff.get(), i);
@@ -149,6 +184,8 @@ std::vector<FileStat> RepoAnalyzer::analyze() {
                 continue;
             }
 
+            commit_has_matching_files = true;
+
             auto& entry = stats_map[file_path];
             if (entry.commit_count == 0) {
                 entry.path = file_path;
@@ -157,6 +194,10 @@ std::vector<FileStat> RepoAnalyzer::analyze() {
                 entry.last_hash = short_hash;
             }
             entry.commit_count++;
+        }
+
+        if (commit_has_matching_files) {
+            record_activity(activity_stats, commit_time);
         }
     }
 
@@ -185,5 +226,5 @@ std::vector<FileStat> RepoAnalyzer::analyze() {
     }
     
 
-    return results;
+    return {std::move(results), std::move(activity_stats)};
 }
