@@ -1,7 +1,7 @@
 #pragma once
 #include "analyzer/types.hpp"
 #include "libs/json.hpp"
-using json = nlohmann::json;
+using json = nlohmann::ordered_json;
 
 class OutputPrinter {
 public:
@@ -25,6 +25,10 @@ private:
     void output_activity_table(std::ostream& out);
 
     void output_activity_csv(std::ostream& out);
+
+    void output_activity_html(std::ostream& out);
+
+    void output_activity_json(json& j);
 
     void to_json(json& j, const FileStat& stat);
 };

@@ -4,6 +4,7 @@
 #include <iomanip>
 #include <fstream>
 #include <cmath>
+#include <map>
 
 namespace {
 
@@ -21,6 +22,28 @@ std::string escape_html(std::string_view data) {
         }
     }
     return buffer;
+}
+
+std::string get_key_for_activity_type(ActivityType type, int value) {
+    switch (type) {
+        case ActivityType::HOUR:
+            return std::to_string(value);
+        case ActivityType::DAY: {
+            static const char* days[] = {"Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"};
+            return days[value];
+        }
+        case ActivityType::MONTH:
+            return std::to_string(value);
+        case ActivityType::YEAR: {
+            static const char* months[] = {
+                "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+            };
+            return months[value - 1];
+        }
+        default:
+            return "";
+    }
 }
 
 }
@@ -206,6 +229,25 @@ void OutputPrinter::output_activity_csv(std::ostream& out) {
 
 }
 
+void OutputPrinter::output_activity_json(json& activity_obj) {
+    const auto& act = options_.activity;
+    std::map<ActivityType, std::string> types = {
+        {ActivityType::HOUR, "hour"},
+        {ActivityType::DAY, "wday"},
+        {ActivityType::MONTH, "mday"},
+        {ActivityType::YEAR, "month"}
+    };
+
+    activity_obj["type"] = types[act.type];
+    activity_obj["total_commits"] = act.total_commits;
+    json buckets_json = json::object();
+    for (const auto& [key, count] : act.buckets) {
+        std::string key_str = get_key_for_activity_type(act.type, key);
+        buckets_json[key_str] = count;
+    }
+    activity_obj["buckets"] = buckets_json;
+}
+
 void OutputPrinter::output_table() {
     std::ofstream file_out;
     if (!options_.output_file.empty()) {
@@ -246,13 +288,22 @@ void OutputPrinter::output_json() {
     }
 
     std::ostream& out = options_.output_file.empty() ? std::cout : file_out;
-    json result;
-    size_t limit = std::min<size_t>(options_.stats.size(), options_.top);
-    json j;
-    for (size_t i = 0; i < limit; ++i) {
-        to_json(j, options_.stats[i]);
-        result.push_back(j);
+    json result = json::object();
+
+    json activity_json = json::object();
+    if (options_.activity.type != ActivityType::NONE) {
+        output_activity_json(activity_json);
+        result["activity"] = activity_json;
     }
+
+    size_t limit = std::min<size_t>(options_.stats.size(), options_.top);
+    json files = json::array();
+    for (size_t i = 0; i < limit; ++i) {
+        json j = json::object();
+        to_json(j, options_.stats[i]);
+        files.push_back(j);
+    }
+    result["files"] = files;
 
     out << result.dump(4) << "\n";
 }
