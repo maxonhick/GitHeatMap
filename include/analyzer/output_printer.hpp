@@ -26,8 +26,6 @@ private:
 
     void output_activity_csv(std::ostream& out);
 
-    void output_activity_html(std::ostream& out);
-
     void output_activity_json(json& j);
 
     void to_json(json& j, const FileStat& stat);

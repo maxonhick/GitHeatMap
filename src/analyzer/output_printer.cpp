@@ -46,6 +46,67 @@ std::string get_key_for_activity_type(ActivityType type, int value) {
     }
 }
 
+struct ActivityBarItem {
+    std::string label;
+    uint64_t count;
+};
+
+std::vector<ActivityBarItem> get_ordered_activity_items(const ActivityStats& act) {
+    std::vector<ActivityBarItem> items;
+    if (act.type == ActivityType::NONE) return items;
+
+    switch (act.type) {
+        case ActivityType::HOUR: {
+            for (int h = 0; h < 24; ++h) {
+                uint64_t count = act.buckets.count(h) ? act.buckets.at(h) : 0;
+                char buf[8];
+                std::snprintf(buf, sizeof(buf), "%02d", h);
+                items.push_back({buf, count});
+            }
+            break;
+        }
+        case ActivityType::DAY: {
+            static const char* days[] = {"Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"};
+            for (int d = 0; d < 7; ++d) {
+                uint64_t count = act.buckets.count(d) ? act.buckets.at(d) : 0;
+                items.push_back({days[d], count});
+            }
+            break;
+        }
+        case ActivityType::MONTH: {
+            for (int d = 1; d <= 31; ++d) {
+                uint64_t count = act.buckets.count(d) ? act.buckets.at(d) : 0;
+                items.push_back({std::to_string(d), count});
+            }
+            break;
+        }
+        case ActivityType::YEAR: {
+            static const char* months[] = {
+                "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+            };
+            for (int m = 1; m <= 12; ++m) {
+                uint64_t count = act.buckets.count(m) ? act.buckets.at(m) : 0;
+                items.push_back({months[m - 1], count});
+            }
+            break;
+        }
+        default:
+            break;
+    }
+    return items;
+}
+
+std::string get_activity_title(ActivityType type) {
+    switch (type) {
+        case ActivityType::HOUR:  return "Activity by Hour of Day (00:00 - 23:00)";
+        case ActivityType::DAY:   return "Activity by Day of Week";
+        case ActivityType::MONTH: return "Activity by Day of Month (1 - 31)";
+        case ActivityType::YEAR:  return "Activity by Month of Year";
+        default:                  return "Commit Activity";
+    }
+}
+
 }
 
 void OutputPrinter::to_json(json& j, const FileStat& stat) {
@@ -359,7 +420,7 @@ void OutputPrinter::output_html() {
         << "    :root {\n"
         << "      --bg: #0d1117; --card-bg: #161b22; --border: #30363d;\n"
         << "      --text: #c9d1d9; --text-muted: #8b949e; --accent: #58a6ff;\n"
-        << "      --bar-start: #238636; --bar-end: #da3633;\n"
+        << "      --bar-start: #238636; --bar-end: #388bfd;\n"
         << "    }\n"
         << "    body {\n"
         << "      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;\n"
@@ -369,6 +430,42 @@ void OutputPrinter::output_html() {
         << "    .container { max-width: 1200px; margin: 0 auto; }\n"
         << "    h1 { margin-bottom: 0.5rem; font-size: 1.8rem; }\n"
         << "    .meta { color: var(--text-muted); margin-bottom: 1.5rem; font-size: 0.95rem; }\n"
+        << "\n"
+        << "    /* Стили для Activity Chart */\n"
+        << "    .card {\n"
+        << "      background-color: var(--card-bg); border: 1px solid var(--border);\n"
+        << "      border-radius: 6px; padding: 1.5rem; margin-bottom: 2rem;\n"
+        << "    }\n"
+        << "    .card-title { font-size: 1.1rem; font-weight: 600; margin-bottom: 1.2rem; display: flex; justify-content: space-between; }\n"
+        << "    .chart-container {\n"
+        << "      display: flex; align-items: flex-end; gap: 6px; height: 160px;\n"
+        << "      padding-top: 20px; border-bottom: 1px solid var(--border);\n"
+        << "    }\n"
+        << "    .chart-col {\n"
+        << "      flex: 1; display: flex; flex-direction: column; align-items: center;\n"
+        << "      height: 100%; justify-content: flex-end; position: relative;\n"
+        << "    }\n"
+        << "    .chart-bar {\n"
+        << "      width: 100%; min-width: 8px; max-width: 32px;\n"
+        << "      background: linear-gradient(180deg, var(--bar-end), var(--bar-start));\n"
+        << "      border-radius: 3px 3px 0 0; transition: height 0.3s ease, filter 0.2s;\n"
+        << "      position: relative;\n"
+        << "    }\n"
+        << "    .chart-col:hover .chart-bar { filter: brightness(1.25); cursor: pointer; }\n"
+        << "    .chart-label {\n"
+        << "      font-size: 0.75rem; color: var(--text-muted); margin-top: 6px;\n"
+        << "      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;\n"
+        << "    }\n"
+        << "    .chart-tooltip {\n"
+        << "      visibility: hidden; opacity: 0; position: absolute; bottom: 100%;\n"
+        << "      background-color: #21262d; color: var(--text); border: 1px solid var(--border);\n"
+        << "      padding: 4px 8px; border-radius: 4px; font-size: 0.75rem; white-space: nowrap;\n"
+        << "      transform: translateY(-4px); transition: opacity 0.2s;\n"
+        << "      pointer-events: none; z-index: 10;\n"
+        << "    }\n"
+        << "    .chart-col:hover .chart-tooltip { visibility: visible; opacity: 1; }\n"
+        << "\n"
+        << "    /* Стили таблицы файлов */\n"
         << "    table {\n"
         << "      width: 100%; border-collapse: collapse;\n"
         << "      background-color: var(--card-bg); border-radius: 6px;\n"
@@ -380,26 +477,62 @@ void OutputPrinter::output_html() {
         << "    tr:hover td { background-color: rgba(110, 118, 129, 0.08); }\n"
         << "    .path { font-family: monospace; font-size: 0.9rem; word-break: break-all; }\n"
         << "    .hash { font-family: monospace; font-size: 0.85rem; color: var(--accent); }\n"
-        << "    .bar-cell { min-width: 180px; width: 25%; }\n"
+        << "    .bar-cell { min-width: 160px; width: 20%; }\n"
         << "    .bar-track {\n"
         << "      background-color: #21262d; border-radius: 4px;\n"
-        << "      height: 14px; width: 100%; overflow: hidden; display: flex;\n"
+        << "      height: 12px; width: 100%; overflow: hidden; display: flex;\n"
         << "    }\n"
         << "    .bar-fill {\n"
         << "      height: 100%; border-radius: 4px;\n"
-        << "      background: linear-gradient(90deg, var(--bar-start), var(--bar-end));\n"
+        << "      background: linear-gradient(90deg, #238636, #da3633);\n"
         << "    }\n"
         << "  </style>\n"
         << "</head>\n"
         << "<body>\n"
         << "  <div class=\"container\">\n"
         << "    <h1>GitHeatMap Activity Report</h1>\n"
-        << "    <div class=\"meta\">Analyzed " << options_.stats.size() << " files (showing top " << limit << ")</div>\n"
-        << "    <table>\n"
+        << "    <div class=\"meta\">Analyzed " << options_.stats.size() << " files"
+        << (options_.top > 0 ? " (showing top " + std::to_string(limit) + ")" : "") << "</div>\n";
+
+    if (options_.activity.type != ActivityType::NONE) {
+        auto activity_items = get_ordered_activity_items(options_.activity);
+        uint64_t max_act_commits = 1;
+        for (const auto& item : activity_items) {
+            if (item.count > max_act_commits) {
+                max_act_commits = item.count;
+            }
+        }
+
+        out << "    <div class=\"card\">\n"
+            << "      <div class=\"card-title\">\n"
+            << "        <span>" << get_activity_title(options_.activity.type) << "</span>\n"
+            << "        <span style=\"color: var(--text-muted); font-size: 0.9rem;\">"
+            << options_.activity.total_commits << " commits total</span>\n"
+            << "      </div>\n"
+            << "      <div class=\"chart-container\">\n";
+
+        for (const auto& item : activity_items) {
+            double height_pct = (static_cast<double>(item.count) / max_act_commits) * 100.0;
+            if (item.count > 0 && height_pct < 4.0) {
+                height_pct = 4.0;
+            }
+
+            out << "        <div class=\"chart-col\">\n"
+                << "          <div class=\"chart-tooltip\">" << item.label << ": " << item.count << " commits</div>\n"
+                << "          <div class=\"chart-bar\" style=\"height: " << std::fixed << std::setprecision(1) << height_pct << "%;\"></div>\n"
+                << "          <span class=\"chart-label\">" << escape_html(item.label) << "</span>\n"
+                << "        </div>\n";
+        }
+
+        out << "      </div>\n"
+            << "    </div>\n";
+    }
+
+    out << "    <table>\n"
         << "      <thead>\n"
         << "        <tr>\n"
-        << "          <th style=\"width: 80px;\">Commits</th>\n"
-        << "          <th class=\"bar-cell\">Activity</th>\n"
+        << "          <th style=\"width: 70px;\">Commits</th>\n"
+        << "          <th class=\"bar-cell\">Heat</th>\n"
         << "          <th>File Path</th>\n"
         << "          <th>Last Change</th>\n"
         << "          <th>Author</th>\n"
