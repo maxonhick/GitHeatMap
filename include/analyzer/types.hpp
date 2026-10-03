@@ -2,11 +2,26 @@
 #include <string>
 #include <vector>
 #include <cstdint>
+#include <map>
 
 enum SortBy {
     COMMIT_COUNT,
     LAST_CHANGE,
     FILE_NAME
+};
+
+enum ActivityType{
+    NONE,
+    HOUR, // hour of day: 0-23
+    DAY, // day of week: 0-6
+    MONTH, // day of month: 1-31
+    YEAR, // month of year: 1-12
+};
+
+struct ActivityStats {
+    ActivityType type = ActivityType::NONE;
+    std::map<int, uint64_t> buckets;
+    uint64_t total_commits = 0;
 };
 
 struct FilterOptions {
@@ -19,6 +34,7 @@ struct FilterOptions {
     std::vector<std::string> exclude_patterns;
     std::string author_pattern = "";
     SortBy sort_by = SortBy::COMMIT_COUNT;
+    ActivityType activity_type = ActivityType::NONE;
 };
 
 struct FileStat {
@@ -41,4 +57,5 @@ struct OutputOptions {
     std::string output_file = "";
     int top = 10;
     std::vector<FileStat> stats;
+    ActivityStats activity;
 };

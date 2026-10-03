@@ -96,13 +96,13 @@ TEST_F(RepoAnalyzerTest, CountsCommitsAndIdentifiesLastCommit) {
     opts.sort_by = SortBy::COMMIT_COUNT;
 
     RepoAnalyzer analyzer(opts);
-    auto stats = analyzer.analyze();
+    auto res = analyzer.analyze();
 
-    ASSERT_EQ(stats.size(), 3);
-    EXPECT_EQ(stats[0].path, "file1.cpp");
-    EXPECT_EQ(stats[0].commit_count, 3);
-    EXPECT_EQ(stats[0].last_author, "Charlie");
-    EXPECT_EQ(stats[0].last_commit_time, 1700000000);
+    ASSERT_EQ(res.files.size(), 3);
+    EXPECT_EQ(res.files[0].path, "file1.cpp");
+    EXPECT_EQ(res.files[0].commit_count, 3);
+    EXPECT_EQ(res.files[0].last_author, "Charlie");
+    EXPECT_EQ(res.files[0].last_commit_time, 1700000000);
 }
 
 TEST_F(RepoAnalyzerTest, FilterByExtension) {
@@ -111,10 +111,10 @@ TEST_F(RepoAnalyzerTest, FilterByExtension) {
     opts.extensions = {".md"};
 
     RepoAnalyzer analyzer(opts);
-    auto stats = analyzer.analyze();
+    auto res = analyzer.analyze();
 
-    ASSERT_EQ(stats.size(), 1);
-    EXPECT_EQ(stats[0].path, "file2.md");
+    ASSERT_EQ(res.files.size(), 1);
+    EXPECT_EQ(res.files[0].path, "file2.md");
 }
 
 TEST_F(RepoAnalyzerTest, FilterByAuthor) {
@@ -123,10 +123,10 @@ TEST_F(RepoAnalyzerTest, FilterByAuthor) {
     opts.author_pattern = "Bob";
 
     RepoAnalyzer analyzer(opts);
-    auto stats = analyzer.analyze();
+    auto res = analyzer.analyze();
 
-    ASSERT_EQ(stats.size(), 2);
-    for (const auto& item : stats) {
+    ASSERT_EQ(res.files.size(), 2);
+    for (const auto& item : res.files) {
         EXPECT_EQ(item.last_author, "Bob");
     }
 }
@@ -138,10 +138,10 @@ TEST_F(RepoAnalyzerTest, FilterByTimestampSinceUntil) {
     opts.until_timestamp = 1660000000;
 
     RepoAnalyzer analyzer(opts);
-    auto stats = analyzer.analyze();
+    auto res = analyzer.analyze();
 
-    ASSERT_EQ(stats.size(), 2);
-    for (const auto& item : stats) {
+    ASSERT_EQ(res.files.size(), 2);
+    for (const auto& item : res.files) {
         EXPECT_EQ(item.last_commit_time, 1650000000);
     }
 }
@@ -152,8 +152,44 @@ TEST_F(RepoAnalyzerTest, ExcludePatterns) {
     opts.exclude_patterns = {"*.cpp", "*.txt"};
 
     RepoAnalyzer analyzer(opts);
-    auto stats = analyzer.analyze();
+    auto res = analyzer.analyze();
 
-    ASSERT_EQ(stats.size(), 1);
-    EXPECT_EQ(stats[0].path, "file2.md");
+    ASSERT_EQ(res.files.size(), 1);
+    EXPECT_EQ(res.files[0].path, "file2.md");
+}
+
+TEST_F(RepoAnalyzerTest, CollectsActivityHistogram) {
+    FilterOptions opts;
+    opts.repo_path = repo_dir.string();
+    opts.activity_type = ActivityType::DAY;
+
+    RepoAnalyzer analyzer(opts);
+    auto res = analyzer.analyze();
+
+    EXPECT_EQ(res.activity.total_commits, 3);
+    EXPECT_FALSE(res.activity.buckets.empty());
+}
+
+TEST_F(RepoAnalyzerTest, ActivityRespectsFileFilters) {
+    FilterOptions opts;
+    opts.repo_path = repo_dir.string();
+    opts.extensions = {".nonexistent"};
+    opts.activity_type = ActivityType::DAY;
+
+    RepoAnalyzer analyzer(opts);
+    auto res = analyzer.analyze();
+
+    EXPECT_EQ(res.activity.total_commits, 0);
+    EXPECT_TRUE(res.activity.buckets.empty());
+}
+
+TEST_F(RepoAnalyzerTest, FilterByBranchOrHead) {
+    FilterOptions opts;
+    opts.repo_path = repo_dir.string();
+    opts.branch = "HEAD";
+
+    RepoAnalyzer analyzer(opts);
+    auto res = analyzer.analyze();
+
+    EXPECT_EQ(res.files.size(), 3);
 }

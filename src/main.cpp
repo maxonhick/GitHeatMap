@@ -49,6 +49,15 @@ int main(int argc, char* argv[]) {
         ->default_val(PrintType::TABLE);
     app.add_option("--output", out_opts.output_file, "The output file")->default_val("");
     app.add_option("-a,--author", opts.author_pattern, "Filter commits by author name or pattern (e.g. 'John', '*bot*')")->default_val("");
+    const std::map<std::string, ActivityType> activity_map = {
+        {"day", ActivityType::NONE},
+        {"wday", ActivityType::DAY},
+        {"hour", ActivityType::HOUR},
+        {"mday", ActivityType::MONTH},
+        {"month", ActivityType::YEAR}
+    };
+    app.add_option("--activity", opts.activity_type, "Show activity histogram: 'hour'(hour in day), 'wday'(day of week), 'mday'(day of month), or 'month'(month of year)")
+        ->transform(CLI::CheckedTransformer(activity_map, CLI::ignore_case));
 
     CLI11_PARSE(app, argc, argv);
 
@@ -63,7 +72,10 @@ int main(int argc, char* argv[]) {
     std::cout << "Analyzing repository at: " << opts.repo_path << " ...\n";
 
     RepoAnalyzer analyzer(opts);
-    out_opts.stats = analyzer.analyze();
+    auto result = analyzer.analyze();
+
+    out_opts.stats = std::move(result.files);
+    out_opts.activity = std::move(result.activity);
 
     if (out_opts.stats.empty()) {
         std::cout << "No commits or files found matching criteria.\n";

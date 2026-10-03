@@ -4,17 +4,13 @@ project(GitHeatMap)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# -------------------------------------------------------------
-# Сборка статической libgit2 через FetchContent
-# -------------------------------------------------------------
 include(FetchContent)
 
-# Отключаем ненужные для анализатора модули libgit2 ради ускорения сборки
 set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
 set(BUILD_TESTS OFF CACHE BOOL "" FORCE)
 set(BUILD_CLI OFF CACHE BOOL "" FORCE)
 set(USE_SSH OFF CACHE BOOL "" FORCE)
-set(USE_HTTPS OFF CACHE BOOL "" FORCE)       # Для локального анализатора сеть не нужна
+set(USE_HTTPS OFF CACHE BOOL "" FORCE)
 set(REGEX_BACKEND "builtin" CACHE STRING "" FORCE)
 
 FetchContent_Declare(
@@ -24,9 +20,6 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(libgit2)
 
-# -------------------------------------------------------------
-# Основной исполняемый файл
-# -------------------------------------------------------------
 add_executable(${PROJECT_NAME}
     src/main.cpp
     src/analyzer/repo_analyzer.cpp
@@ -38,10 +31,8 @@ target_include_directories(${PROJECT_NAME} PRIVATE
     ${libgit2_SOURCE_DIR}/include
 )
 
-# Линкуем статический таргет libgit2package
 target_link_libraries(${PROJECT_NAME} PRIVATE libgit2package)
 
-# Системные зависимости для статической линковки
 if(APPLE)
     target_link_libraries(${PROJECT_NAME} PRIVATE
         "-framework CoreFoundation"
@@ -54,7 +45,6 @@ if(UNIX AND NOT APPLE)
     find_package(Threads REQUIRED)
     target_link_libraries(${PROJECT_NAME} PRIVATE 
         Threads::Threads
-        # Вшиваем runtime C++ и C для максимальной переносимости между дистрибутивами Linux
         -static-libgcc
         -static-libstdc++
     )
@@ -67,17 +57,13 @@ if(WIN32)
         rpcrt4
         ole32
     )
-    # Статический рантайм MSVC (/MT вместо /MD)
     set_property(TARGET ${PROJECT_NAME} PROPERTY
         MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 endif()
 
-# -------------------------------------------------------------
-# Тесты
-# -------------------------------------------------------------
-option(BUILD_TESTS "Build tests" ON)
+option(GITHEATMAP_BUILD_TESTS "Build tests" ON)
 
-if(BUILD_TESTS)
+if(GITHEATMAP_BUILD_TESTS)
     enable_testing()
 
     FetchContent_Declare(
