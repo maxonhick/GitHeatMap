@@ -206,8 +206,10 @@ TEST_F(OutputPrinterTest, OutputHtmlWithActivityChart) {
 
 // Checking file save and .activity.csv generation
 TEST_F(OutputPrinterTest, OutputCsvWritesToFileAndCreatesActivityFile) {
-    fs::path temp_dir = fs::temp_directory_path() / "githeatmap_printer_test";
+    auto unique_suffix = std::to_string(std::chrono::system_clock::now().time_since_epoch().count());
+    fs::path temp_dir = fs::temp_directory_path() / ("githeatmap_printer_test_" + unique_suffix);
     fs::create_directories(temp_dir);
+
     fs::path main_csv = temp_dir / "report.csv";
     fs::path act_csv = temp_dir / "report.csv.activity.csv";
 
@@ -225,17 +227,22 @@ TEST_F(OutputPrinterTest, OutputCsvWritesToFileAndCreatesActivityFile) {
     ASSERT_TRUE(fs::exists(main_csv));
     ASSERT_TRUE(fs::exists(act_csv));
 
-    std::ifstream main_in(main_csv);
-    std::string main_content((std::istreambuf_iterator<char>(main_in)), std::istreambuf_iterator<char>());
-    EXPECT_NE(main_content.find("COUNT,FILE,LAST_CHANGE,HASH"), std::string::npos);
-    EXPECT_NE(main_content.find("src/main.cpp"), std::string::npos);
+    {
+        std::ifstream main_in(main_csv);
+        std::string main_content((std::istreambuf_iterator<char>(main_in)), std::istreambuf_iterator<char>());
+        EXPECT_NE(main_content.find("COUNT,FILE,LAST_CHANGE,HASH"), std::string::npos);
+        EXPECT_NE(main_content.find("src/main.cpp"), std::string::npos);
+    }
 
-    std::ifstream act_in(act_csv);
-    std::string act_content((std::istreambuf_iterator<char>(act_in)), std::istreambuf_iterator<char>());
-    EXPECT_NE(act_content.find("PERIOD,COUNT"), std::string::npos);
-    EXPECT_NE(act_content.find("Mon,5"), std::string::npos);
+    {
+        std::ifstream act_in(act_csv);
+        std::string act_content((std::istreambuf_iterator<char>(act_in)), std::istreambuf_iterator<char>());
+        EXPECT_NE(act_content.find("PERIOD,COUNT"), std::string::npos);
+        EXPECT_NE(act_content.find("Mon,5"), std::string::npos);
+    }
 
-    fs::remove_all(temp_dir);
+    std::error_code ec;
+    fs::remove_all(temp_dir, ec);
 }
 
 // Checking escape of special characters in HTML

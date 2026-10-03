@@ -79,3 +79,18 @@ TEST(DateParserTest, ThrowsOnInvalidInput) {
     EXPECT_THROW(filter::parse_date_to_timestamp("not-a-date"), std::runtime_error);
     EXPECT_THROW(filter::parse_date_to_timestamp("2026/05/10"), std::runtime_error);
 }
+
+TEST(DateParserTest, ParsesKeywordsTodayAndYesterday) {
+    int64_t today = filter::parse_date_to_timestamp("today");
+    int64_t yesterday = filter::parse_date_to_timestamp("yesterday");
+
+    EXPECT_GT(today, 0);
+    EXPECT_EQ(today - yesterday, 86400);
+}
+
+TEST(DateParserTest, ParsesWordsAsNumbers) {
+    int64_t now = std::time(nullptr);
+    EXPECT_NEAR(filter::parse_date_to_timestamp("two.weeks"), now - (14 * 86400), 2);
+    EXPECT_NEAR(filter::parse_date_to_timestamp("three.days"), now - (3 * 86400), 2);
+    EXPECT_NEAR(filter::parse_date_to_timestamp("a.month"), now - (30 * 86400), 2);
+}

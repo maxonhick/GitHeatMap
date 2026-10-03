@@ -169,3 +169,27 @@ TEST_F(RepoAnalyzerTest, CollectsActivityHistogram) {
     EXPECT_EQ(res.activity.total_commits, 3);
     EXPECT_FALSE(res.activity.buckets.empty());
 }
+
+TEST_F(RepoAnalyzerTest, ActivityRespectsFileFilters) {
+    FilterOptions opts;
+    opts.repo_path = repo_dir.string();
+    opts.extensions = {".nonexistent"};
+    opts.activity_type = ActivityType::DAY;
+
+    RepoAnalyzer analyzer(opts);
+    auto res = analyzer.analyze();
+
+    EXPECT_EQ(res.activity.total_commits, 0);
+    EXPECT_TRUE(res.activity.buckets.empty());
+}
+
+TEST_F(RepoAnalyzerTest, FilterByBranchOrHead) {
+    FilterOptions opts;
+    opts.repo_path = repo_dir.string();
+    opts.branch = "HEAD";
+
+    RepoAnalyzer analyzer(opts);
+    auto res = analyzer.analyze();
+
+    EXPECT_EQ(res.files.size(), 3);
+}
